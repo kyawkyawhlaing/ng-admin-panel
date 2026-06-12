@@ -170,13 +170,25 @@ export class LoginComponent {
     this.http.post<{ token: string; user: any }>('/api/auth/login', { email, password }).subscribe({
       next: (response) => {
         const { token, user } = response;
-        const roles = user.roles ? user.roles.map((r: any) => r.name) : [];
+        // The BFF now returns roles as an array of strings directly from the JWT
+        const roles = user.roles || [];
+        
+        // Extract permissions from the new resourceAccess array
+        const permissions: string[] = [];
+        if (user.resourceAccess) {
+          user.resourceAccess.forEach((ra: any) => {
+            if (ra.permissions) {
+              permissions.push(...ra.permissions);
+            }
+          });
+        }
         
         this.authStore.setAuth(
-          { id: user.id.toString(), email: user.email, name: user.displayName || `${user.firstName} ${user.lastName}` },
+          // Since firstName/lastName are not in the new .NET JWT, we fallback to email prefix for name
+          { id: user.id?.toString() || '', email: user.email, name: user.email.split('@')[0] },
           token,
           roles,
-          [] // Permissions are not returned yet
+          permissions
         );
         this.isLoading.set(false);
         this.router.navigate(['/admin/dashboard']);
