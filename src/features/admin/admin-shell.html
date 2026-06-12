@@ -1,0 +1,194 @@
+<div class="flex h-screen w-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 overflow-hidden select-none">
+  
+  <!-- Mobile Drawer Backdrop -->
+  @if (isMobile() && isMobileOpen()) {
+    <div 
+      (click)="toggleSidebar()"
+      class="fixed inset-0 z-40 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-xs transition-opacity duration-300"
+    ></div>
+  }
+
+  <!-- Collapsible Side Navigation Drawer -->
+  <aside 
+    [class.w-64]="!isCollapsed() || isMobile()"
+    [class.w-20]="isCollapsed() && !isMobile()"
+    [class.translate-x-0]="!isMobile() || isMobileOpen()"
+    [class.-translate-x-full]="isMobile() && !isMobileOpen()"
+    class="fixed inset-y-0 left-0 z-50 flex h-full flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 transition-all duration-300 ease-in-out md:static md:translate-x-0"
+  >
+    
+    <!-- Sidebar Header (Brand info) -->
+    <div class="flex h-16 shrink-0 items-center border-b border-slate-100 dark:border-slate-800 px-6 gap-3">
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+        </svg>
+      </div>
+      @if (!isCollapsed() || isMobile()) {
+        <span class="text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100 overflow-hidden text-ellipsis whitespace-nowrap">mFIU Admin</span>
+      }
+    </div>
+
+    <!-- Navigation Links -->
+    <nav class="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
+      @for (item of menuItems; track item.route) {
+        <a [routerLink]="item.route"
+           routerLinkActive="bg-blue-50/70 text-blue-600 font-semibold border-blue-500! dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-400!"
+           [routerLinkActiveOptions]="{ exact: item.route === '/admin/dashboard' }"
+           (click)="onNavItemClick()"
+           class="flex items-center rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700/50 hover:text-slate-900 dark:hover:text-slate-200 transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+           [class.justify-center]="isCollapsed() && !isMobile()"
+           [attr.aria-label]="item.title">
+          <svg class="h-5 w-5 shrink-0" 
+               fill="none" 
+               viewBox="0 0 24 24" 
+               stroke="currentColor" 
+               stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="item.icon" />
+          </svg>
+          @if (!isCollapsed() || isMobile()) {
+            <span class="ml-3 truncate">{{ item.title }}</span>
+          }
+        </a>
+      }
+    </nav>
+  </aside>
+
+  <!-- Main Content Wrapper -->
+  <div class="flex flex-1 flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
+    
+    <!-- Top Navbar Header -->
+    <header class="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 px-4 sm:px-6">
+      <div class="flex items-center gap-4">
+        <!-- Drawer Trigger Button -->
+        <button (click)="toggleSidebar()" 
+                class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors cursor-pointer"
+                aria-label="Toggle navigation menu">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25H12" />
+          </svg>
+        </button>
+        
+        <!-- Breadcrumbs Title -->
+        <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">Enterprise Admin System</span>
+      </div>
+      
+      <!-- Right Side Header Icons / User Info -->
+      <div class="relative flex items-center gap-3">
+        
+        <!-- Theme Switcher Toggle Button -->
+        <button (click)="themeStore.toggleTheme()" 
+                class="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-colors cursor-pointer"
+                [attr.aria-label]="themeStore.theme() === 'light' ? 'Switch to dark theme' : 'Switch to light theme'">
+          @if (themeStore.theme() === 'light') {
+            <!-- Moon Icon for dark mode -->
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+            </svg>
+          } @else {
+            <!-- Sun Icon for light mode -->
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m0 13.5V21M4.22 4.22l1.59 1.59m12.38 12.38l1.59 1.59M3 12h2.25m13.5 0H21m-16.78 6.78l1.59-1.59m12.38-12.38l1.59-1.59M12 7.5a4.5 4.5 0 110 9 4.5 4.5 0 010-9z" />
+            </svg>
+          }
+        </button>
+
+        <div class="relative">
+          <button (click)="toggleProfileMenu($event)" 
+                  class="flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 p-1.5 rounded-lg transition-colors cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                  aria-haspopup="true" 
+                  [attr.aria-expanded]="isProfileMenuOpen()">
+            <div class="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-xs font-bold text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900/60 shrink-0 select-none">
+              {{ userInitial() }}
+            </div>
+            <span class="hidden text-sm font-semibold text-slate-700 dark:text-slate-200 sm:block select-none">{{ userName() }}</span>
+            <svg class="h-4 w-4 text-slate-400 hidden sm:block shrink-0 transition-transform duration-200" [class.rotate-180]="isProfileMenuOpen()" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Dropdown menu -->
+          @if (isProfileMenuOpen()) {
+            <div class="absolute right-0 z-50 mt-2 w-48 origin-top-right rounded-lg bg-white dark:bg-slate-800 py-1 shadow-lg ring-1 ring-black/5 dark:ring-white/10 focus:outline-none border border-slate-200 dark:border-slate-700 transition-all duration-100">
+              <div class="px-4 py-2.5 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 rounded-t-lg">
+                <p class="text-xs text-slate-400 font-medium leading-none">Signed in as</p>
+                <p class="text-xs font-semibold text-slate-700 dark:text-slate-300 truncate mt-1.5">{{ userEmail() }}</p>
+              </div>
+              <a routerLink="/admin/profile" (click)="isProfileMenuOpen.set(false)" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer">Your Profile</a>
+              <a routerLink="/admin/settings" (click)="isProfileMenuOpen.set(false)" class="block px-4 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-slate-100 transition-colors cursor-pointer">Settings</a>
+              <button (click)="triggerLogout()" 
+                      type="button"
+                      class="w-full text-left block px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:text-red-700 dark:hover:text-red-300 border-t border-slate-100 dark:border-slate-700 transition-colors cursor-pointer">
+                Sign out
+              </button>
+            </div>
+          }
+        </div>
+      </div>
+    </header>
+
+    <!-- Main View Scrollable Container -->
+    <main class="flex-1 overflow-y-auto p-6 md:p-8">
+      <div class="max-w-7xl mx-auto">
+        <router-outlet />
+      </div>
+    </main>
+  </div>
+  
+  <!-- Logout Confirmation Dialog -->
+  @if (showLogoutDialog()) {
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+      <!-- Backdrop -->
+      <div 
+        class="fixed inset-0 bg-slate-900/40 dark:bg-slate-950/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-300"
+        (click)="!isLoggingOut() && cancelLogout()"
+      ></div>
+
+      <!-- Dialog Panel -->
+      <div class="relative overflow-hidden rounded-2xl bg-white dark:bg-slate-800 text-left shadow-xl transition-all w-full max-w-sm sm:max-w-md animate-in zoom-in-95 duration-300 border border-slate-200 dark:border-slate-700">
+        <div class="px-6 py-6">
+          <div class="flex items-start gap-4">
+            <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 dark:bg-red-900/30 sm:h-12 sm:w-12">
+              <svg class="h-6 w-6 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+              </svg>
+            </div>
+            <div class="pt-1">
+              <h3 class="text-lg font-semibold leading-6 text-slate-900 dark:text-slate-100">Sign out</h3>
+              <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Are you sure you want to sign out? You will need to log back in to access your dashboard.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div class="bg-slate-50 dark:bg-slate-900/50 px-6 py-4 flex flex-col-reverse sm:flex-row sm:justify-end gap-3 border-t border-slate-100 dark:border-slate-700/50">
+          <button 
+            type="button" 
+            (click)="cancelLogout()"
+            [disabled]="isLoggingOut()"
+            class="inline-flex w-full justify-center rounded-lg bg-white dark:bg-slate-800 px-4 py-2.5 text-sm font-semibold text-slate-900 dark:text-slate-200 shadow-xs ring-1 ring-inset ring-slate-300 dark:ring-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 sm:w-auto transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            type="button" 
+            (click)="confirmLogout()"
+            [disabled]="isLoggingOut()"
+            class="inline-flex w-full justify-center items-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-red-500 sm:w-auto transition-colors disabled:opacity-80 disabled:cursor-not-allowed cursor-pointer"
+          >
+            @if (isLoggingOut()) {
+              <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Signing out...
+            } @else {
+              Sign out
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+</div>

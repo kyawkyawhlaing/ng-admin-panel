@@ -1,3 +1,215 @@
 /* You can add global styles to this file, and also import other style files */
 
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
+
+@import '@angular/material/prebuilt-themes/azure-blue.css';
+
+/* Override Material Form Fields to make them flat, minimalist and enterprise-ready */
+.mat-mdc-form-field {
+  --mdc-outlined-text-field-outline-color: var(--color-slate-200) !important;
+  --mdc-outlined-text-field-hover-outline-color: var(--color-slate-400) !important;
+  --mdc-outlined-text-field-focus-outline-color: var(--color-blue-600) !important;
+  --mdc-outlined-text-field-focus-outline-width: 1.5px !important;
+  --mdc-outlined-text-field-container-shape: 8px !important;
+  
+  --mat-form-field-state-error-hover-outline-color: var(--color-red-400) !important;
+  --mat-form-field-state-error-focus-outline-color: var(--color-red-500) !important;
+  --mat-form-field-state-error-outline-color: var(--color-red-300) !important;
+  
+  width: 100%;
+}
+
+/* Override input font and colors to match enterprise style */
+.mat-mdc-form-field .mdc-text-field--outlined {
+  background-color: var(--color-white) !important;
+}
+
+.mat-mdc-input-element {
+  font-family: var(--font-sans) !important;
+  color: var(--color-slate-900) !important;
+  font-size: 0.875rem !important; /* 14px */
+}
+
+/* Material Labels */
+.mat-mdc-form-field .mdc-floating-label {
+  font-family: var(--font-sans) !important;
+  color: var(--color-slate-500) !important;
+  font-size: 0.875rem !important;
+}
+
+.mat-mdc-form-field.mat-focused .mdc-floating-label {
+  color: var(--color-blue-600) !important;
+}
+
+/* Subtext & errors */
+.mat-mdc-form-field .mat-mdc-form-field-subscript-wrapper {
+  font-size: 0.75rem !important;
+  color: var(--color-slate-500) !important;
+  padding-left: 4px !important;
+  margin-top: 4px !important;
+}
+
+.mat-mdc-form-field .mat-mdc-error {
+  color: var(--color-red-600) !important;
+  font-weight: 500 !important;
+}
+
+/* Overriding Angular Material Buttons to look flat/minimalist */
+.mat-mdc-flat-button {
+  --mdc-flat-button-container-shape: 8px !important;
+  letter-spacing: normal !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 600 !important;
+  height: 44px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.mat-mdc-flat-button:not(:disabled) {
+  background-color: var(--color-blue-600) !important;
+  color: var(--color-white) !important;
+  cursor: pointer !important;
+}
+
+.mat-mdc-flat-button:hover:not(:disabled) {
+  background-color: var(--color-blue-500) !important;
+  color: var(--color-white) !important;
+  box-shadow: 0 4px 6px -1px rgb(59 130 246 / 0.15), 0 2px 4px -2px rgb(59 130 246 / 0.15) !important;
+  transform: translateY(-1px) !important;
+}
+
+.mat-mdc-flat-button:active:not(:disabled) {
+  transform: translateY(0.5px) !important;
+  box-shadow: none !important;
+}
+
+.mat-mdc-flat-button:disabled,
+.mat-mdc-flat-button.mat-mdc-button-disabled {
+  background-color: var(--color-slate-100) !important;
+  color: var(--color-slate-400) !important;
+  cursor: not-allowed !important;
+  pointer-events: auto !important; /* Allows displaying the not-allowed cursor */
+  opacity: 0.65 !important;
+  border: 1px solid var(--color-slate-200) !important;
+  box-shadow: none !important;
+}
+
+.mat-mdc-flat-button.is-loading:disabled,
+.mat-mdc-flat-button.is-loading.mat-mdc-button-disabled,
+.mat-mdc-unelevated-button.is-loading:disabled,
+.mat-mdc-unelevated-button.is-loading.mat-mdc-button-disabled,
+button.is-loading:disabled,
+button.is-loading.mat-mdc-button-disabled,
+.is-loading:disabled,
+.is-loading.mat-mdc-button-disabled {
+  background-color: var(--color-blue-600) !important;
+  color: var(--color-white) !important;
+  cursor: wait !important;
+  pointer-events: auto !important;
+  opacity: 0.8 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+button:disabled {
+  cursor: not-allowed !important;
+  pointer-events: auto !important;
+}
+
+button.is-loading:disabled {
+  cursor: wait !important;
+}
+
+/* Custom styles for checkbox input */
+input[type="checkbox"] {
+  accent-color: var(--color-blue-600);
+}
+
+/* Center HTML5 dialog elements globally and override Tailwind CSS margin: 0 reset */
+dialog {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: auto !important;
+}
+
+/* Dark Mode Overrides for Angular Material Components */
+.dark {
+  color-scheme: dark;
+}
+
+.dark .mat-mdc-form-field {
+  --mdc-outlined-text-field-outline-color: var(--color-slate-700) !important;
+  --mdc-outlined-text-field-hover-outline-color: var(--color-slate-500) !important;
+  --mdc-outlined-text-field-focus-outline-color: var(--color-blue-500) !important;
+  --mat-form-field-state-error-hover-outline-color: var(--color-red-500) !important;
+  --mat-form-field-state-error-focus-outline-color: var(--color-red-400) !important;
+  --mat-form-field-state-error-outline-color: var(--color-red-600) !important;
+}
+
+.dark .mat-mdc-form-field .mdc-text-field--outlined {
+  background-color: var(--color-slate-800) !important;
+}
+
+.dark .mat-mdc-input-element {
+  color: var(--color-slate-100) !important;
+}
+
+.dark .mat-mdc-form-field .mdc-floating-label {
+  color: var(--color-slate-400) !important;
+}
+
+.dark .mat-mdc-form-field.mat-focused .mdc-floating-label {
+  color: var(--color-blue-500) !important;
+}
+
+.dark .mat-mdc-form-field .mat-mdc-form-field-subscript-wrapper {
+  color: var(--color-slate-400) !important;
+}
+
+/* Material Table overrides for dark mode */
+.mat-mdc-table {
+  white-space: nowrap;
+}
+
+th.mat-mdc-header-cell {
+  white-space: nowrap;
+}
+
+td.mat-mdc-cell {
+  white-space: nowrap;
+}
+
+.dark .mat-mdc-table {
+  background-color: var(--color-slate-800) !important;
+  color: var(--color-slate-200) !important;
+}
+
+.dark th.mat-mdc-header-cell {
+  background-color: var(--color-slate-900) !important;
+  color: var(--color-slate-300) !important;
+  border-bottom: 1px solid var(--color-slate-700) !important;
+}
+
+.dark td.mat-mdc-cell {
+  border-bottom: 1px solid var(--color-slate-700) !important;
+  color: var(--color-slate-300) !important;
+}
+
+.dark tr.mat-mdc-header-row {
+  background-color: var(--color-slate-900) !important;
+}
+
+.dark tr.mat-mdc-row:hover {
+  background-color: var(--color-slate-700) !important;
+}
+
+.dark .mat-mdc-flat-button:disabled,
+.dark .mat-mdc-flat-button.mat-mdc-button-disabled {
+  background-color: var(--color-slate-800) !important;
+  color: var(--color-slate-500) !important;
+  border: 1px solid var(--color-slate-700) !important;
+}
+
+.dark input[type="checkbox"] {
+  accent-color: var(--color-blue-500);
+}
