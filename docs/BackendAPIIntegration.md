@@ -90,9 +90,43 @@ export const baseUrlInterceptor: HttpInterceptorFn = (req, next) => {
 };
 ```
 
-## Step 5: Remove the Mock Server
+## Step 5: Implement the BFF Pattern (Proxying)
 
-Once your real backend is fully functional:
-1. Delete the `src/server/mock-data.ts` and `src/server/api.ts` files.
-2. In `server.ts` (the SSR entry point), remove the Express API routes mapping `server.use('/api', apiRouter);`.
-3. The Express `server.ts` will now solely serve as the SSR renderer for your Angular application without handling backend endpoints.
+Instead of exposing your real backend APIs directly to the browser (which reveals your microservices/backend architecture), you can utilize the existing Node.js Express server (`server.ts`) as a Backend-for-Frontend (BFF). This conceals the true backend endpoints and simplifies CORS.
+
+To achieve this, you will use `http-proxy-middleware` inside `server.ts` to transparently route all frontend `/api` requests to your real ASP.NET Core/Java/Rust backend.
+
+**1. Install Proxy Middleware:**
+```bash
+npm install http-proxy-middleware
+# or if using pnpm: pnpm add http-proxy-middleware
+```
+
+**2. Update `server.ts` to Proxy Requests:**
+Replace the mock API routes in `src/server.ts` with the proxy middleware:
+
+```typescript
+import { createProxyMiddleware } from 'http-proxy-middleware';
+
+// Remove the mock API router
+// import { apiRouter } from './server/api'; 
+// server.use('/api', apiRouter);
+
+// Add the BFF Proxy
+server.use('/api', createProxyMiddleware({
+  target: 'https://internal-api.yourdomain.com', // Your real backend URL
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api': '', // Optional: remove /api prefix when sending to backend
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    // Optional: Add server-to-server authentication headers here
+    // proxyReq.setHeader('X-API-KEY', process.env.BACKEND_API_KEY);
+  }
+}));
+```
+
+Using this BFF approach:
+1. The Angular frontend only ever talks to its own origin (`/api/...`).
+2. The browser never sees `https://internal-api.yourdomain.com`.
+3. You bypass complex CORS configurations on the real backend because the Node.js server makes the requests server-to-server.
