@@ -1,6 +1,7 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
 import { PermissionsTable, MenuStatusTable } from '../../../types/database';
 
@@ -30,10 +31,14 @@ const initialState: PermissionsState = {
 
 export const PermissionsStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient)) => {
+  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
     
-    const loadPermissions = async () => {
-      patchState(store, { isLoading: true, error: null });
+    const loadPermissions = async (background: boolean = false) => {
+      if (!background) {
+        patchState(store, { isLoading: true, error: null });
+      } else {
+        patchState(store, { error: null });
+      }
       try {
         const payload = {
           searchTerm: store.filterText() || null,
@@ -63,12 +68,12 @@ export const PermissionsStore = signalStore(
 
       async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
-        await loadPermissions();
+        await loadPermissions(true);
       },
 
       async setPage(index: number, size: number) {
         patchState(store, { pageIndex: index, pageSize: size });
-        await loadPermissions();
+        await loadPermissions(true);
       },
 
       async toggleSort(field: keyof PermissionsTable, multi: boolean = false) {
@@ -89,12 +94,12 @@ export const PermissionsStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
-        await loadPermissions();
+        await loadPermissions(true);
       },
 
       async clearSorts() {
         patchState(store, { sorts: [], pageIndex: 0 });
-        await loadPermissions();
+        await loadPermissions(true);
       },
 
       loadPermissions,
@@ -108,23 +113,25 @@ export const PermissionsStore = signalStore(
         }
       },
 
-      async addPermission(permission: Omit<PermissionsTable, 'id'>) {
-        patchState(store, { isLoading: true, error: null });
+      async addPermission(permission: any) {
         try {
           await lastValueFrom(http.post('https://localhost:5001/permissions', permission));
-          await loadPermissions();
+          snackBar.open('Permission successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadPermissions(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to create permission: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error adding permission:', err);
         }
       },
 
-      async editPermission(id: number, permission: Partial<PermissionsTable>) {
-        patchState(store, { isLoading: true, error: null });
+      async editPermission(id: number, permission: any) {
         try {
           await lastValueFrom(http.put(`https://localhost:5001/permissions/${id}`, permission));
-          await loadPermissions();
+          snackBar.open('Permission successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadPermissions(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to update permission: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error editing permission:', err);
         }
       }
     };

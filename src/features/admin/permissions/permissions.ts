@@ -9,12 +9,14 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatButtonModule } from '@angular/material/button';
+import { SkeletonTableComponent } from '../../../shared/components/skeleton-table';
 import { AdminStore, AdminStoreType } from '../admin-store';
 import { PermissionsStore } from './permissions-store';
 import { MenusStore } from '../menus/menus-store';
 import { AssignmentDialogComponent } from '../../../shared/components/assignment-dialog';
 import { Menu } from '../../../types/rbac';
 import { PermissionsTable, ActionStatus } from '../../../types/database';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon, Edit } from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-permissions',
@@ -27,9 +29,19 @@ import { PermissionsTable, ActionStatus } from '../../../types/database';
     MatSelectModule,
     MatAutocompleteModule,
     MatButtonModule,
-    AssignmentDialogComponent
+    AssignmentDialogComponent,
+    SkeletonTableComponent,
+    LucideAngularModule
   ],
-  providers: [PermissionsStore, MenusStore],
+  providers: [
+    PermissionsStore, 
+    MenusStore,
+    {
+      provide: LUCIDE_ICONS,
+      multi: true,
+      useValue: new LucideIconProvider({ Menu: MenuIcon, Edit })
+    }
+  ],
   template: `
     <div class="space-y-6">
       <!-- Header Section -->
@@ -97,24 +109,19 @@ import { PermissionsTable, ActionStatus } from '../../../types/database';
         </div>
       </div>
 
-      <!-- CallState Feedback -->
+      <!-- Loading State -->
       @if (permissionsStore.isLoading()) {
-        <div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-2">
-          <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span>Loading data...</span>
+        <app-skeleton-table 
+          [columns]="['ID', 'Name', 'Action', 'Resource', 'Description', 'Visible Menus', 'Actions']"
+          [rows]="permissionsStore.pageSize()" 
+        />
+      } @else if (permissionsStore.error()) {
+        <div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-600 dark:text-red-400">
+          {{ permissionsStore.error() }}
         </div>
-      }
-      @if (permissionsStore.error(); as err) {
-        <div class="rounded-md bg-red-50 dark:bg-red-950/40 p-4 border border-red-200 dark:border-red-900/60 text-sm text-red-800 dark:text-red-400">
-          {{ err }}
-        </div>
-      }
-
-      <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 sm:rounded-xl shadow-xs">
-        <table mat-table [dataSource]="permissionsStore.pagedPermissions()" class="w-full !bg-white dark:!bg-slate-800">
+      } @else {
+        <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 sm:rounded-xl shadow-xs">
+          <table mat-table [dataSource]="permissionsStore.pagedPermissions()" class="w-full !bg-white dark:!bg-slate-800">
           
           <!-- ID Column -->
           <ng-container matColumnDef="id">
@@ -226,9 +233,7 @@ import { PermissionsTable, ActionStatus } from '../../../types/database';
                   class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors font-semibold cursor-pointer"
                   title="Assign Menus"
                 >
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
+                  <lucide-icon name="menu" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                 </button>
                 <button 
                   type="button" 
@@ -236,9 +241,7 @@ import { PermissionsTable, ActionStatus } from '../../../types/database';
                   class="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors font-semibold cursor-pointer"
                   title="Edit Permission"
                 >
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
+                  <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                 </button>
               </div>
             </td>
@@ -269,6 +272,7 @@ import { PermissionsTable, ActionStatus } from '../../../types/database';
           class="!bg-transparent border-t border-slate-100 dark:border-slate-700"
         />
       </div>
+      }
     </div>
 
     <!-- Menu Assignment Dialog -->

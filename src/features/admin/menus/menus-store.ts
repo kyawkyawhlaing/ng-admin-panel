@@ -1,6 +1,7 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
 import { MenusTable } from '../../../types/database';
 
@@ -28,7 +29,7 @@ const initialState: MenusState = {
 
 export const MenusStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient)) => {
+  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
     // We remove the local computed properties for sortedMenus and filteredMenus
     // since we're using server-side pagination now.
     const pagedMenus = computed(() => store.menus());
@@ -40,12 +41,12 @@ export const MenusStore = signalStore(
 
       setFilterText(text: string): void {
         patchState(store, { filterText: text, pageIndex: 0 });
-        this.loadMenus();
+        this.loadMenus(true);
       },
 
       setPage(index: number, size: number): void {
         patchState(store, { pageIndex: index, pageSize: size });
-        this.loadMenus();
+        this.loadMenus(true);
       },
 
       toggleSort(field: keyof MenusTable, multi: boolean = false): void {
@@ -66,16 +67,20 @@ export const MenusStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
-        this.loadMenus();
+        this.loadMenus(true);
       },
 
       clearSorts(): void {
         patchState(store, { sorts: [] });
-        this.loadMenus();
+        this.loadMenus(true);
       },
 
-      async loadMenus() {
-        patchState(store, { isLoading: true, error: null });
+      async loadMenus(background: boolean = false) {
+        if (!background) {
+          patchState(store, { isLoading: true, error: null });
+        } else {
+          patchState(store, { error: null });
+        }
         try {
           const payload = {
             searchTerm: store.filterText() || null,
@@ -90,23 +95,25 @@ export const MenusStore = signalStore(
         }
       },
 
-      async addMenu(menu: Omit<MenusTable, 'id'>) {
-        patchState(store, { isLoading: true, error: null });
+      async addMenu(menu: any) {
         try {
           await lastValueFrom(http.post('https://localhost:5001/menus', menu));
-          this.loadMenus();
+          snackBar.open('Menu successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await this.loadMenus(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to create menu: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error adding menu:', err);
         }
       },
 
-      async editMenu(id: number, menu: Partial<MenusTable>) {
-        patchState(store, { isLoading: true, error: null });
+      async editMenu(id: number, menu: any) {
         try {
           await lastValueFrom(http.put(`https://localhost:5001/menus/${id}`, menu));
-          this.loadMenus();
+          snackBar.open('Menu successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await this.loadMenus(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to update menu: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error editing menu:', err);
         }
       }
     };

@@ -10,8 +10,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { AdminStore, AdminStoreType } from '../admin-store';
 import { UsersStore } from './users-store';
 import { AssignmentDialogComponent } from '../../../shared/components/assignment-dialog';
+import { SkeletonTableComponent } from '../../../shared/components/skeleton-table';
 import { Role } from '../../../types/rbac';
 import { UsersTable } from '../../../types/database';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, ShieldCheck, Lock, Unlock, Edit } from 'lucide-angular';
 
 const passwordMatchValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const password = control.get('password');
@@ -31,9 +33,18 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
     MatInputModule,
     MatButtonModule,
     MatSelectModule,
-    AssignmentDialogComponent
+    AssignmentDialogComponent,
+    SkeletonTableComponent,
+    LucideAngularModule
   ],
-  providers: [UsersStore],
+  providers: [
+    UsersStore,
+    {
+      provide: LUCIDE_ICONS,
+      multi: true,
+      useValue: new LucideIconProvider({ ShieldCheck, Lock, Unlock, Edit })
+    }
+  ],
   template: `
     <div class="space-y-6">
       <!-- Header Section -->
@@ -124,9 +135,15 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
         </div>
       </div>
 
-      <!-- Users Datatable -->
-      <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-xs">
-        <table mat-table [dataSource]="usersStore.pagedUsers()" class="w-full !bg-transparent">
+      <!-- Users Datatable or Skeleton -->
+      @if (usersStore.isLoading()) {
+        <app-skeleton-table 
+          [columns]="['Display Name', 'Email', 'First Name', 'Last Name', 'Roles', 'Status', 'MFA', 'Created At', 'Actions']"
+          [rows]="usersStore.pageSize()" 
+        />
+      } @else {
+        <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-xl bg-white dark:bg-slate-800 shadow-xs">
+          <table mat-table [dataSource]="usersStore.pagedUsers()" class="w-full !bg-transparent">
           
           <!-- Display Name Column -->
           <ng-container matColumnDef="display_name">
@@ -302,9 +319,7 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
                   class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors cursor-pointer"
                   title="Assign Roles"
                 >
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
+                  <lucide-icon name="shield-check" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                 </button>
                 
                 <!-- Toggle Lockout Button -->
@@ -319,13 +334,9 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
                   [title]="user.is_locked_out ? 'Unlock User' : 'Lock User'"
                 >
                   @if (user.is_locked_out) {
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                    </svg>
+                    <lucide-icon name="lock" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                   } @else {
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
+                    <lucide-icon name="unlock" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                   }
                 </button>
 
@@ -336,9 +347,7 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
                   class="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors cursor-pointer"
                   title="Edit User"
                 >
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
+                  <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                 </button>
               </div>
             </td>
@@ -359,16 +368,17 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
           </div>
         }
 
-        <!-- Paginator -->
-        <mat-paginator 
-          [length]="usersStore.totalUsersCount()"
-          [pageIndex]="usersStore.pageIndex()"
-          [pageSize]="usersStore.pageSize()"
-          [pageSizeOptions]="[5, 10, 20]"
-          (page)="onPageEvent($event)"
-          class="!bg-transparent border-t border-slate-100 dark:border-slate-700"
-        />
-      </div>
+          <!-- Paginator -->
+          <mat-paginator 
+            [length]="usersStore.totalUsersCount()"
+            [pageIndex]="usersStore.pageIndex()"
+            [pageSize]="usersStore.pageSize()"
+            [pageSizeOptions]="[5, 10, 20]"
+            (page)="onPageEvent($event)"
+            class="!bg-transparent border-t border-slate-100 dark:border-slate-700"
+          />
+        </div>
+      }
     </div>
 
     <!-- User Assignment Dialog popup -->

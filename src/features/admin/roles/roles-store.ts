@@ -1,6 +1,7 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
 import { RolesTable } from '../../../types/database';
 
@@ -28,9 +29,13 @@ const initialState: RolesState = {
 
 export const RolesStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient)) => {
-    const loadRoles = async () => {
-      patchState(store, { isLoading: true, error: null });
+  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
+    const loadRoles = async (background: boolean = false) => {
+      if (!background) {
+        patchState(store, { isLoading: true, error: null });
+      } else {
+        patchState(store, { error: null });
+      }
       try {
         const payload = {
           searchTerm: store.filterText() || null,
@@ -59,12 +64,12 @@ export const RolesStore = signalStore(
 
       async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
-        await loadRoles();
+        await loadRoles(true);
       },
 
       async setPage(index: number, size: number) {
         patchState(store, { pageIndex: index, pageSize: size });
-        await loadRoles();
+        await loadRoles(true);
       },
 
       async toggleSort(field: keyof RolesTable, multi: boolean = false) {
@@ -85,33 +90,35 @@ export const RolesStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
-        await loadRoles();
+        await loadRoles(true);
       },
 
       async clearSorts() {
         patchState(store, { sorts: [] });
-        await loadRoles();
+        await loadRoles(true);
       },
 
       loadRoles,
 
-      async addRole(role: Omit<RolesTable, 'id'>) {
-        patchState(store, { isLoading: true, error: null });
+      async addRole(role: any) {
         try {
           await lastValueFrom(http.post('https://localhost:5001/roles', role));
-          await loadRoles();
+          snackBar.open('Role successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadRoles(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to create role: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error adding role:', err);
         }
       },
 
-      async editRole(id: number, role: Partial<RolesTable>) {
-        patchState(store, { isLoading: true, error: null });
+      async editRole(id: number, role: any) {
         try {
           await lastValueFrom(http.put(`https://localhost:5001/roles/${id}`, role));
-          await loadRoles();
+          snackBar.open('Role successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadRoles(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to update role: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error editing role:', err);
         }
       }
     };

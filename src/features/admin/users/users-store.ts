@@ -1,6 +1,7 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
 import { UsersTable } from '../../../types/database';
 
@@ -13,6 +14,7 @@ export interface UsersState {
   pageIndex: number;
   pageSize: number;
   sorts: Array<{ field: keyof UsersTable; direction: 'asc' | 'desc' }>;
+  isLoading: boolean;
 }
 
 const initialState: UsersState = {
@@ -23,14 +25,18 @@ const initialState: UsersState = {
   twoFactorFilter: 'all',
   pageIndex: 0,
   pageSize: 5,
-  sorts: []
+  sorts: [],
+  isLoading: false
 };
 
 export const UsersStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient)) => {
+  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
     
-    const loadUsers = async () => {
+    const loadUsers = async (background: boolean = false) => {
+      if (!background) {
+        patchState(store, { isLoading: true });
+      }
       try {
         const payload = {
           searchTerm: store.filterText() || null,
@@ -47,9 +53,11 @@ export const UsersStore = signalStore(
 
         patchState(store, { 
           users: response.items, 
-          totalUsersCount: response.metadata.totalCount 
+          totalUsersCount: response.metadata.totalCount,
+          isLoading: false
         });
       } catch (err) {
+        patchState(store, { isLoading: false });
         console.error('Error loading users:', err);
       }
     };
@@ -60,22 +68,22 @@ export const UsersStore = signalStore(
 
       async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
-        await loadUsers();
+        await loadUsers(true);
       },
 
       async setLockoutFilter(filter: 'all' | 'locked' | 'active') {
         patchState(store, { lockoutFilter: filter, pageIndex: 0 });
-        await loadUsers();
+        await loadUsers(true);
       },
 
       async setTwoFactorFilter(filter: 'all' | 'enabled' | 'disabled') {
         patchState(store, { twoFactorFilter: filter, pageIndex: 0 });
-        await loadUsers();
+        await loadUsers(true);
       },
 
       async setPage(index: number, size: number) {
         patchState(store, { pageIndex: index, pageSize: size });
-        await loadUsers();
+        await loadUsers(true);
       },
 
       async toggleSort(field: keyof UsersTable, multi: boolean = false) {
@@ -96,12 +104,12 @@ export const UsersStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
-        await loadUsers();
+        await loadUsers(true);
       },
 
       async clearSorts() {
         patchState(store, { sorts: [], pageIndex: 0 });
-        await loadUsers();
+        await loadUsers(true);
       },
 
       loadUsers,
@@ -109,8 +117,10 @@ export const UsersStore = signalStore(
       async addUser(user: any) {
         try {
           await lastValueFrom(http.post('https://localhost:5001/users', user));
-          await loadUsers();
-        } catch (err) {
+          snackBar.open('User successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadUsers(true);
+        } catch (err: any) {
+          snackBar.open(`Failed to create user: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
           console.error('Error adding user:', err);
         }
       },
@@ -118,8 +128,10 @@ export const UsersStore = signalStore(
       async editUser(id: string, user: any) {
         try {
           await lastValueFrom(http.put(`https://localhost:5001/users/${id}`, user));
-          await loadUsers();
-        } catch (err) {
+          snackBar.open('User successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadUsers(true);
+        } catch (err: any) {
+          snackBar.open(`Failed to update user: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
           console.error('Error editing user:', err);
         }
       },
@@ -136,7 +148,7 @@ export const UsersStore = signalStore(
           };
           // Simulate toggle locally until endpoint is fully ready or just call put
           await lastValueFrom(http.put(`https://localhost:5001/users/${userId}`, payload));
-          await loadUsers();
+          await loadUsers(true);
         } catch (err) {
            console.error('Error toggling lockout:', err);
            // Fallback optimistic update
