@@ -35,6 +35,9 @@ export const AuthStore = signalStore(
     setAuth(user: User, token: string, roles: string[], permissions: string[]): void {
       patchState(store, { user, token, roles, permissions, error: null });
     },
+    updateToken(token: string): void {
+      patchState(store, { token });
+    },
     clearAuth(): void {
       patchState(store, { user: null, token: null, roles: [], permissions: [], error: null });
     },
@@ -62,6 +65,7 @@ export interface AuthStoreType {
   readonly error: Signal<string | null>;
   readonly isAuthenticated: Signal<boolean>;
   setAuth(user: User, token: string, roles: string[], permissions: string[]): void;
+  updateToken(token: string): void;
   clearAuth(): void;
   setLoading(isLoading: boolean): void;
   setError(error: string | null): void;

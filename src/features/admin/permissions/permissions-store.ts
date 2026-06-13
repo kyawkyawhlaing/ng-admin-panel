@@ -7,6 +7,7 @@ import { PermissionsTable, MenuStatusTable } from '../../../types/database';
 export interface PermissionsState {
   permissions: PermissionsTable[];
   menuStatuses: MenuStatusTable[];
+  totalPermissionsCount: number;
   filterText: string;
   pageIndex: number;
   pageSize: number;
@@ -18,6 +19,7 @@ export interface PermissionsState {
 const initialState: PermissionsState = {
   permissions: [],
   menuStatuses: [],
+  totalPermissionsCount: 0,
   filterText: '',
   pageIndex: 0,
   pageSize: 5,
@@ -29,75 +31,47 @@ const initialState: PermissionsState = {
 export const PermissionsStore = signalStore(
   withState(initialState),
   withMethods((store, http = inject(HttpClient)) => {
-    // Computed filtering
-    const filteredPermissions = computed(() => {
-      let list = store.permissions();
-      const text = store.filterText().toLowerCase().trim();
+    
+    const loadPermissions = async () => {
+      patchState(store, { isLoading: true, error: null });
+      try {
+        const payload = {
+          searchTerm: store.filterText() || null,
+          sorts: store.sorts().map(s => ({ field: s.field, direction: s.direction })),
+          pageNumber: store.pageIndex() + 1, // Backend uses 1-based index
+          pageSize: store.pageSize()
+        };
 
-      if (text) {
-        list = list.filter(p => 
-          p.name.toLowerCase().includes(text) ||
-          (p.resource && p.resource.toLowerCase().includes(text)) ||
-          p.action.toLowerCase().includes(text)
+        const response = await lastValueFrom(
+          http.post<{ metadata: { totalCount: number }, items: PermissionsTable[] }>('https://localhost:5001/permissions/list', payload)
         );
+
+        patchState(store, { 
+          permissions: response.items, 
+          totalPermissionsCount: response.metadata.totalCount,
+          isLoading: false
+        });
+      } catch (err: any) {
+        patchState(store, { error: err.message, isLoading: false });
+        console.error('Error loading permissions:', err);
       }
-      return list;
-    });
-
-    // Computed sorting
-    const sortedPermissions = computed(() => {
-      const list = [...filteredPermissions()];
-      const sorts = store.sorts();
-      
-      if (sorts.length === 0) return list;
-
-      list.sort((a, b) => {
-        for (const sort of sorts) {
-          const valA = a[sort.field];
-          const valB = b[sort.field];
-
-          if (valA === valB) continue;
-          if (valA === null || valA === undefined) return sort.direction === 'asc' ? 1 : -1;
-          if (valB === null || valB === undefined) return sort.direction === 'asc' ? -1 : 1;
-
-          if (typeof valA === 'string' && typeof valB === 'string') {
-            const comp = valA.localeCompare(valB);
-            return sort.direction === 'asc' ? comp : -comp;
-          }
-
-          const comp = valA < valB ? -1 : 1;
-          return sort.direction === 'asc' ? comp : -comp;
-        }
-        return 0;
-      });
-
-      return list;
-    });
-
-    // Computed paging
-    const pagedPermissions = computed(() => {
-      const list = sortedPermissions();
-      const start = store.pageIndex() * store.pageSize();
-      return list.slice(start, start + store.pageSize());
-    });
-
-    const totalPermissionsCount = computed(() => filteredPermissions().length);
+    };
 
     return {
-      filteredPermissions,
-      sortedPermissions,
-      pagedPermissions,
-      totalPermissionsCount,
+      pagedPermissions: computed(() => store.permissions()),
+      totalPermissionsCount: computed(() => store.totalPermissionsCount()),
 
-      setFilterText(text: string): void {
+      async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
+        await loadPermissions();
       },
 
-      setPage(index: number, size: number): void {
+      async setPage(index: number, size: number) {
         patchState(store, { pageIndex: index, pageSize: size });
+        await loadPermissions();
       },
 
-      toggleSort(field: keyof PermissionsTable, multi: boolean = false): void {
+      async toggleSort(field: keyof PermissionsTable, multi: boolean = false) {
         const current = store.sorts();
         const existing = current.find(s => s.field === field);
         let nextSorts: Array<{ field: keyof PermissionsTable; direction: 'asc' | 'desc' }> = [];
@@ -115,25 +89,19 @@ export const PermissionsStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
+        await loadPermissions();
       },
 
-      clearSorts(): void {
-        patchState(store, { sorts: [] });
+      async clearSorts() {
+        patchState(store, { sorts: [], pageIndex: 0 });
+        await loadPermissions();
       },
 
-      async loadPermissions() {
-        patchState(store, { isLoading: true, error: null });
-        try {
-          const permissions = await lastValueFrom(http.get<PermissionsTable[]>('/api/permissions'));
-          patchState(store, { permissions, isLoading: false, pageIndex: 0 });
-        } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
-        }
-      },
+      loadPermissions,
 
       async loadMenuStatuses() {
         try {
-          const menuStatuses = await lastValueFrom(http.get<MenuStatusTable[]>('/api/menu_statuses'));
+          const menuStatuses = await lastValueFrom(http.get<MenuStatusTable[]>('https://localhost:5001/menus/statuses'));
           patchState(store, { menuStatuses });
         } catch (err: any) {
           console.error('Failed to load menu statuses', err);
@@ -143,9 +111,8 @@ export const PermissionsStore = signalStore(
       async addPermission(permission: Omit<PermissionsTable, 'id'>) {
         patchState(store, { isLoading: true, error: null });
         try {
-          await lastValueFrom(http.post('/api/permissions', permission));
-          const permissions = await lastValueFrom(http.get<PermissionsTable[]>('/api/permissions'));
-          patchState(store, { permissions, isLoading: false, pageIndex: 0 });
+          await lastValueFrom(http.post('https://localhost:5001/permissions', permission));
+          await loadPermissions();
         } catch (err: any) {
           patchState(store, { error: err.message, isLoading: false });
         }
@@ -154,9 +121,8 @@ export const PermissionsStore = signalStore(
       async editPermission(id: number, permission: Partial<PermissionsTable>) {
         patchState(store, { isLoading: true, error: null });
         try {
-          await lastValueFrom(http.put(`/api/permissions/${id}`, permission));
-          const permissions = await lastValueFrom(http.get<PermissionsTable[]>('/api/permissions'));
-          patchState(store, { permissions, isLoading: false });
+          await lastValueFrom(http.put(`https://localhost:5001/permissions/${id}`, permission));
+          await loadPermissions();
         } catch (err: any) {
           patchState(store, { error: err.message, isLoading: false });
         }

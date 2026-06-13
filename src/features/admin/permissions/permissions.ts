@@ -316,18 +316,28 @@ import { PermissionsTable, ActionStatus } from '../../../types/database';
 
           <mat-form-field appearance="outline" class="w-full !m-0">
             <mat-label>Resource</mat-label>
-            <input 
-              matInput 
-              formControlName="resource" 
-              placeholder="Type or select a resource..." 
-              [matAutocomplete]="autoResource"
-              (input)="onResourceInput($event)"
-            />
-            <mat-autocomplete #autoResource="matAutocomplete" (optionSelected)="onResourceSelected($event.option.value)">
+            <mat-select formControlName="resource" placeholder="Select a resource..." (opened)="searchInput.focus()">
+              <div class="px-3 py-2 sticky top-0 bg-white dark:bg-slate-800 z-10 border-b border-slate-100 dark:border-slate-700 mb-1">
+                <input 
+                  #searchInput
+                  matInput 
+                  placeholder="Search resource..." 
+                  [value]="resourceSearch()"
+                  (input)="onResourceInput($event)"
+                  (keydown)="$event.stopPropagation()"
+                  class="w-full text-sm outline-none bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                />
+              </div>
               @for (menu of filteredResourceMenus(); track menu.status) {
                 <mat-option [value]="menu.status">{{ menu.status }}</mat-option>
               }
-            </mat-autocomplete>
+              @if (filteredResourceMenus().length === 0) {
+                <div class="px-4 py-3 text-sm text-slate-500 text-center">No matching resources</div>
+              }
+            </mat-select>
+            @if (permissionForm.get('resource')?.hasError('required') && permissionForm.get('resource')?.touched) {
+              <mat-error>Resource is required</mat-error>
+            }
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="w-full !m-0">
@@ -406,7 +416,7 @@ export class PermissionsComponent implements OnInit {
   protected readonly permissionForm = new FormGroup({
     name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     action: new FormControl<ActionStatus>('access', { nonNullable: true, validators: [Validators.required] }),
-    resource: new FormControl<string>('', { nonNullable: true }),
+    resource: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
     description: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] })
   });
 
@@ -483,10 +493,6 @@ export class PermissionsComponent implements OnInit {
     this.resourceSearch.set(input.value);
   }
 
-  protected onResourceSelected(value: string): void {
-    this.resourceSearch.set(value);
-  }
-
   protected onPageEvent(event: PageEvent): void {
     this.permissionsStore.setPage(event.pageIndex, event.pageSize);
   }
@@ -545,7 +551,7 @@ export class PermissionsComponent implements OnInit {
         this.editingPermissionId.set(null);
         this.permissionForm.reset({ name: '', action: 'access', resource: '', description: '' });
       }
-      this.resourceSearch.set(this.permissionForm.controls.resource.value || '');
+      this.resourceSearch.set('');
       modal.showModal();
       setTimeout(() => {
         const firstInput = modal.querySelector('input') as HTMLInputElement;

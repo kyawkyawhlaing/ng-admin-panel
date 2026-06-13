@@ -132,6 +132,38 @@ export const routes: Routes = [
 
 ---
 
+## Example Data Flow: User Creation
+
+To understand how the Angular UI connects to the ASP.NET Core backend through the Express BFF, here is a step-by-step breakdown of the user creation flow:
+
+### 1. The Component Layer (\`users.ts\`)
+When a user clicks submit on the Create User form:
+- The `onCreateSubmit()` method executes and validates the Reactive form data.
+- It extracts the raw values (First Name, Last Name, Email, Password, checkboxes).
+- It calls `this.usersStore.addUser(...)`, mapping the raw password to a temporary `password_clear` field.
+
+### 2. The State Management Layer (\`users-store.ts\`)
+Inside the NgRx SignalStore, the `addUser` method is invoked:
+- It executes an HTTP POST request via Angular's `HttpClient`.
+- Example: `await lastValueFrom(http.post('/api/users/register', { ...user, password: user.password_clear }));`
+- It targets the local frontend path (prefixed with `/api`), mapping the password back to the expected JSON schema.
+
+### 3. The BFF Proxy Layer (\`server.ts\`)
+Because the application uses Angular Server-Side Rendering (SSR), the request hits the Express server backend-for-frontend (BFF) first:
+- The Express server matches the `/api` prefix and passes the request to the `http-proxy-middleware`.
+- **Security Injection:** The proxy extracts the `HttpOnly` JWT cookie (`auth_token`) and attaches it as an `Authorization: Bearer ...` HTTP header.
+- **Path Rewrite:** It strips the `/api` prefix, changing the path from `/api/users/register` to `/users/register`.
+- It securely forwards the POST request over the network to the `.NET` backend.
+
+### 4. The ASP.NET Core Backend (\`Dotnet-NTier\`)
+The backend is responsible for the actual business logic and database persistence:
+- The C# server receives the authorized `POST /users/register` request.
+- It validates the payload against the `RegisterUserCommandValidator`.
+- The `RegisterUserCommandHandler` hashes the password, maps the properties to a new `User` entity, and saves it to the PostgreSQL database via Entity Framework Core.
+- It returns the ID of the newly created user, and the Angular UI successfully refreshes the datatable.
+
+---
+
 ## Best Practices Checklist
 - [ ] **Strict Types:** Always use strict typing; favor `unknown` over `any`.
 - [ ] **Modern Angular:** No `standalone: true`, no `@HostBinding`, no `@HostListener`. Use `host` object in `@Component` instead.

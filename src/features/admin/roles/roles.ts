@@ -352,6 +352,7 @@ export class RolesComponent implements OnInit {
 
   ngOnInit() {
     this.rolesStore.loadRoles();
+    this.adminStore.loadRealData();
   }
 
   protected onHeaderClick(field: keyof RolesTable, event: MouseEvent): void {
