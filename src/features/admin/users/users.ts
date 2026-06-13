@@ -739,14 +739,14 @@ export class UsersComponent implements OnInit {
 
     if (editId) {
       this.usersStore.editUser(editId, {
-        firstName: formVal.first_name,
-        lastName: formVal.last_name,
-        displayName: formVal.display_name,
+        first_name: formVal.first_name,
+        last_name: formVal.last_name,
+        display_name: formVal.display_name,
         email: formVal.email,
         password: formVal.password || undefined,
-        lockoutEnabled: formVal.lockout_enabled,
-        twoFactorEnabled: formVal.two_factor_enabled,
-        firstTimeLogin: formVal.first_time_login
+        lockout_enabled: formVal.lockout_enabled,
+        two_factor_enabled: formVal.two_factor_enabled,
+        first_time_login: formVal.first_time_login
       });
     } else {
       this.usersStore.addUser({

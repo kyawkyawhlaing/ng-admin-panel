@@ -143,8 +143,8 @@ export const UsersStore = signalStore(
         
         try {
           const payload = { 
-            lockoutEnabled: true, 
-            isLockedOut: !user.is_locked_out 
+            lockout_enabled: true, 
+            is_locked_out: !user.is_locked_out 
           };
           // Simulate toggle locally until endpoint is fully ready or just call put
           await lastValueFrom(http.put(`https://localhost:5001/users/${userId}`, payload));
