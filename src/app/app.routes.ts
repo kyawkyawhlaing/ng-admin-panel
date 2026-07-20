@@ -50,10 +50,10 @@ export const routes: Routes = [
         loadComponent: () => import('../features/admin/permissions/permissions').then(m => m.PermissionsComponent)
       },
       {
-        path: 'menus',
+        path: 'navigation',
         canActivate: [permissionGuard],
-        data: { permissions: ['menus_access'] },
-        loadComponent: () => import('../features/admin/menus/menus').then(m => m.MenusComponent)
+        data: { permissions: ['navigation_access'] },
+        loadComponent: () => import('../features/admin/navigation/navigation').then(m => m.NavigationComponent)
       },
       {
         path: 'profile',

@@ -80,25 +80,25 @@ export class DashboardComponent implements OnInit {
     { name: 'Users', value: '0', hint: 'Identity module', route: '/admin/users' },
     { name: 'Roles', value: '0', hint: 'RBAC roles', route: '/admin/roles' },
     { name: 'Permissions', value: '0', hint: 'Policy grants', route: '/admin/permissions' },
-    { name: 'Menus', value: '0', hint: 'Nav resources', route: '/admin/menus' }
+    { name: 'Navigation', value: '0', hint: 'Nav resources', route: '/admin/navigation' }
   ]);
 
   async ngOnInit(): Promise<void> {
     const emptyPayload = { pageNumber: 1, pageSize: 1 };
     const started = performance.now();
     try {
-      const [users, roles, permissions, menus] = await Promise.all([
+      const [users, roles, permissions, navigation] = await Promise.all([
         lastValueFrom(this.http.post<ListMeta>('/users/list', emptyPayload)),
         lastValueFrom(this.http.post<ListMeta>('/roles/list', emptyPayload)),
         lastValueFrom(this.http.post<ListMeta>('/permissions/list', emptyPayload)),
-        lastValueFrom(this.http.post<ListMeta>('/menus/list', emptyPayload))
+        lastValueFrom(this.http.post<ListMeta>('/navigation/list', emptyPayload))
       ]);
 
       this.stats.set([
         { name: 'Users', value: String(users.metadata.totalCount), hint: 'Identity module', route: '/admin/users' },
         { name: 'Roles', value: String(roles.metadata.totalCount), hint: 'RBAC roles', route: '/admin/roles' },
         { name: 'Permissions', value: String(permissions.metadata.totalCount), hint: 'Policy grants', route: '/admin/permissions' },
-        { name: 'Menus', value: String(menus.metadata.totalCount), hint: 'Nav resources', route: '/admin/menus' }
+        { name: 'Navigation', value: String(navigation.metadata.totalCount), hint: 'Nav resources', route: '/admin/navigation' }
       ]);
       this.linkStatus.set('online');
       this.latencyMs.set(Math.round(performance.now() - started));

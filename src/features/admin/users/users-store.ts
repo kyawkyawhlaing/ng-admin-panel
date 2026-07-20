@@ -115,25 +115,47 @@ export const UsersStore = signalStore(
 
       loadUsers,
 
-      async addUser(user: any) {
+      async addUser(user: any): Promise<boolean> {
         try {
           await lastValueFrom(http.post('/users', user));
           toast.success('User successfully created!');
           await loadUsers(true);
+          return true;
         } catch (err: any) {
-          toast.error(`Failed to create user: ${err.message || 'Unknown error'}`);
+          toast.error(
+            err?.error?.detail || err?.message || 'Failed to create user'
+          );
           console.error('Error adding user:', err);
+          return false;
         }
       },
 
-      async editUser(id: string, user: any) {
+      async editUser(id: string, user: any, newPassword?: string): Promise<boolean> {
         try {
           await lastValueFrom(http.put(`/users/${id}`, user));
-          toast.success('User successfully updated!');
+
+          if (newPassword) {
+            await lastValueFrom(
+              http.put(`/users/${id}/password`, {
+                current_password: '',
+                new_password: newPassword
+              })
+            );
+            toast.success('User and password successfully updated!');
+          } else {
+            toast.success('User successfully updated!');
+          }
+
           await loadUsers(true);
+          return true;
         } catch (err: any) {
-          toast.error(`Failed to update user: ${err.message || 'Unknown error'}`);
+          const validation = err?.error?.errors as Array<{ description?: string }> | undefined;
+          const first = validation?.find((e) => e.description)?.description;
+          toast.error(
+            first || err?.error?.detail || err?.message || 'Failed to update user'
+          );
           console.error('Error editing user:', err);
+          return false;
         }
       },
 

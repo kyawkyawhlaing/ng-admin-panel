@@ -1,6 +1,6 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MenusStore } from './menus-store';
+import { NavigationStore } from './navigation-store';
 import {
   KkhPageHeaderComponent,
   KkhButtonComponent,
@@ -14,12 +14,12 @@ import {
   KkhColumnDef,
   SelectOption
 } from '../../../shared/ui';
-import { MenusTable } from '../../../types/database';
+import { NavigationItemTable } from '../../../types/database';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home, Settings, Users, Key, Database, Shield, Layout, FileText, Component as ComponentIcon } from 'lucide-angular';
 
 @Component({
-  selector: 'app-admin-menus',
+  selector: 'app-admin-navigation',
   imports: [
     ReactiveFormsModule,
     FormsModule,
@@ -35,7 +35,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
     LucideAngularModule
   ],
   providers: [
-    MenusStore,
+    NavigationStore,
     {
       provide: LUCIDE_ICONS,
       multi: true,
@@ -58,27 +58,27 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
     <div class="space-y-6 kkh-page-enter">
       <kkh-page-header
         eyebrow="NAV"
-        title="Menus"
+        title="Navigation"
         description="Sidebar routes and visibility for the operator console."
       >
         @if (canCreate()) {
-          <kkh-button variant="primary" (pressed)="openCreateModal()">+ Create Menu</kkh-button>
+          <kkh-button variant="primary" (pressed)="openCreateModal()">+ Create Item</kkh-button>
         }
       </kkh-page-header>
 
-      @if (menusStore.error()) {
-        <kkh-alert tone="danger">{{ menusStore.error() }}</kkh-alert>
+      @if (navigationStore.error()) {
+        <kkh-alert tone="danger">{{ navigationStore.error() }}</kkh-alert>
       }
 
       <kkh-data-table
         [columns]="columns"
-        [rows]="menusStore.pagedMenus()"
-        [totalCount]="menusStore.totalMenusCount()"
-        [pageIndex]="menusStore.pageIndex()"
-        [pageSize]="menusStore.pageSize()"
-        [sorts]="menusStore.sorts()"
-        [loading]="menusStore.isLoading()"
-        emptyTitle="No menus found"
+        [rows]="navigationStore.pagedItems()"
+        [totalCount]="navigationStore.totalCount()"
+        [pageIndex]="navigationStore.pageIndex()"
+        [pageSize]="navigationStore.pageSize()"
+        [sorts]="navigationStore.sorts()"
+        [loading]="navigationStore.isLoading()"
+        emptyTitle="No navigation items found"
         emptyDescription="Try adjusting your filters or search terms."
         (pageChange)="onPage($event)"
         (sortChange)="onSort($event)"
@@ -86,23 +86,23 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
         <div filters class="space-y-3">
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <kkh-input
-              label="Search Menus"
-              placeholder="Search by name, path, or description..."
-              [ngModel]="menusStore.filterText()"
-              (ngModelChange)="menusStore.setFilterText($event)"
+              label="Search Navigation"
+              placeholder="Search by title, route, or description..."
+              [ngModel]="navigationStore.filterText()"
+              (ngModelChange)="navigationStore.setFilterText($event)"
             />
           </div>
           <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
             <p class="kkh-label text-[var(--kkh-muted)] normal-case tracking-normal">
               Tip: Click column headers to sort. <strong>Hold Shift</strong> while clicking to apply a <strong>multiple sort order</strong>.
             </p>
-            @if (menusStore.sorts().length > 0) {
+            @if (navigationStore.sorts().length > 0) {
               <button
                 type="button"
-                (click)="menusStore.clearSorts()"
+                (click)="navigationStore.clearSorts()"
                 class="text-[var(--kkh-accent)] font-mono text-xs uppercase tracking-wider cursor-pointer"
               >
-                Clear active sorts ({{ menusStore.sorts().length }})
+                Clear active sorts ({{ navigationStore.sorts().length }})
               </button>
             }
           </div>
@@ -113,17 +113,21 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
             @if (row.icon) {
               <lucide-icon [name]="row.icon" class="w-5 h-5 text-[var(--kkh-accent)]" [strokeWidth]="2" />
             } @else {
-              <lucide-icon name="menu" class="w-5 h-5 text-[var(--kkh-muted)]" [strokeWidth]="2" />
+              <lucide-icon name="layout" class="w-5 h-5 text-[var(--kkh-muted)]" [strokeWidth]="2" />
             }
           </div>
         </ng-template>
 
-        <ng-template kkhCell="name" let-row>
-          <span>{{ row.name || 'Unnamed Menu' }}</span>
+        <ng-template kkhCell="title" let-row>
+          <span>{{ row.title || 'Untitled' }}</span>
         </ng-template>
 
-        <ng-template kkhCell="api_path" let-row>
-          <span class="text-[var(--kkh-muted)]">{{ row.api_path }}</span>
+        <ng-template kkhCell="route" let-row>
+          <span class="text-[var(--kkh-muted)]">{{ row.route }}</span>
+        </ng-template>
+
+        <ng-template kkhCell="resource" let-row>
+          <span class="text-[var(--kkh-muted)]">{{ row.resource || '-' }}</span>
         </ng-template>
 
         <ng-template kkhCell="description" let-row>
@@ -160,7 +164,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
               type="button"
               (click)="openCreateModal(row)"
               class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
-              title="Edit Menu"
+              title="Edit Navigation Item"
             >
               <lucide-icon name="edit" class="w-4.5 h-4.5" [strokeWidth]="2" />
             </button>
@@ -172,64 +176,73 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
 
     <kkh-dialog
       [open]="isCreateOpen()"
-      [title]="editingMenuId() ? 'Edit Menu' : 'Create New Menu'"
+      [title]="editingItemId() ? 'Edit Navigation Item' : 'Create Navigation Item'"
       [wide]="true"
       [showDefaultActions]="false"
       (closed)="onModalClose()"
     >
-      <form id="menu-form" [formGroup]="menuForm" (ngSubmit)="onCreateSubmit()" class="kkh-dialog__form">
+      <form id="navigation-form" [formGroup]="navForm" (ngSubmit)="onCreateSubmit()" class="kkh-dialog__form">
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <kkh-combo-box
-            label="Menu Name (Resource Mapping)"
-            formControlName="name"
-            placeholder="Select a resource mapping..."
-            endpoint="/menus/statuses/list"
-            [mapItem]="statusMapItem"
-            [error]="menuForm.get('name')?.hasError('required') && menuForm.get('name')?.touched ? 'Name is required' : null"
+          <kkh-input
+            label="Title"
+            formControlName="title"
+            placeholder="e.g. Users"
+            [error]="navForm.get('title')?.hasError('required') && navForm.get('title')?.touched ? 'Title is required' : null"
           />
 
           <kkh-input
-            label="API Path / Route"
-            formControlName="api_path"
+            label="Route (SPA)"
+            formControlName="route"
             placeholder="e.g. /admin/dashboard"
-            [error]="menuForm.get('api_path')?.hasError('required') && menuForm.get('api_path')?.touched ? 'Path is required' : null"
+            [error]="navForm.get('route')?.hasError('required') && navForm.get('route')?.touched ? 'Route is required' : null"
           />
         </div>
 
         <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
-          <kkh-input
-            label="Icon (Optional)"
-            formControlName="icon"
-            placeholder="e.g. users, shield, key, menu"
+          <kkh-combo-box
+            label="Access resource"
+            formControlName="resource"
+            placeholder="Select a resource..."
+            endpoint="/navigation/resources/list"
+            [mapItem]="resourceMapItem"
+            [error]="navForm.get('resource')?.hasError('required') && navForm.get('resource')?.touched ? 'Resource is required' : null"
           />
 
-          <kkh-combo-box
-            label="Parent Menu"
-            formControlName="parent_id"
-            placeholder="Search parent menu..."
-            endpoint="/menus/list"
-            [extraOptions]="rootParentOption"
-            [mapItem]="menuParentMapItem"
-            [error]="menuForm.get('parent_id')?.hasError('required') && menuForm.get('parent_id')?.touched ? 'Parent is required' : null"
+          <kkh-input
+            label="Icon"
+            formControlName="icon"
+            placeholder="e.g. users, shield, key, layout"
           />
         </div>
 
-        <kkh-input
-          label="Sort Order"
-          type="number"
-          formControlName="sort_order"
-        />
+        <div class="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <kkh-combo-box
+            label="Parent"
+            formControlName="parent_id"
+            placeholder="Search parent item..."
+            endpoint="/navigation/list"
+            [extraOptions]="rootParentOption"
+            [mapItem]="parentMapItem"
+            [error]="navForm.get('parent_id')?.hasError('required') && navForm.get('parent_id')?.touched ? 'Parent is required' : null"
+          />
+
+          <kkh-input
+            label="Sort"
+            type="number"
+            formControlName="sort_order"
+          />
+        </div>
 
         <kkh-textarea
           label="Description"
           formControlName="description"
           [rows]="2"
-          placeholder="Brief description of this menu..."
-          [error]="menuForm.get('description')?.hasError('required') && menuForm.get('description')?.touched ? 'Description is required' : null"
+          placeholder="Brief description of this navigation item..."
+          [error]="navForm.get('description')?.hasError('required') && navForm.get('description')?.touched ? 'Description is required' : null"
         />
 
         <div class="kkh-dialog__section">
-          <span class="kkh-field-label">Menu Configuration</span>
+          <span class="kkh-field-label">Visibility</span>
 
           <div class="flex flex-col gap-3">
             <label class="flex items-center cursor-pointer select-none">
@@ -238,7 +251,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
                 formControlName="is_active"
                 class="h-4 w-4 rounded-sm border-[var(--kkh-border)] bg-[var(--kkh-panel)] text-[var(--kkh-accent)] cursor-pointer"
               />
-              <span class="ml-3 text-sm text-[var(--kkh-text)]">Is Active</span>
+              <span class="ml-3 text-sm text-[var(--kkh-text)]">Active</span>
             </label>
 
             <label class="flex items-center cursor-pointer select-none">
@@ -247,34 +260,35 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
                 formControlName="is_visible"
                 class="h-4 w-4 rounded-sm border-[var(--kkh-border)] bg-[var(--kkh-panel)] text-[var(--kkh-accent)] cursor-pointer"
               />
-              <span class="ml-3 text-sm text-[var(--kkh-text)]">Is Visible in Sidebar</span>
+              <span class="ml-3 text-sm text-[var(--kkh-text)]">Visible in sidebar</span>
             </label>
           </div>
         </div>
       </form>
       <div footer class="contents">
         <kkh-button variant="ghost" type="button" (pressed)="closeCreateModal()">Cancel</kkh-button>
-        <kkh-button variant="primary" type="submit" form="menu-form" [disabled]="menuForm.invalid">
-          {{ editingMenuId() ? 'Save Changes' : 'Create Menu' }}
+        <kkh-button variant="primary" type="submit" form="navigation-form" [disabled]="navForm.invalid">
+          {{ editingItemId() ? 'Save Changes' : 'Create Item' }}
         </kkh-button>
       </div>
     </kkh-dialog>
   `
 })
-export class MenusComponent implements OnInit {
-  protected readonly menusStore = inject(MenusStore);
+export class NavigationComponent implements OnInit {
+  protected readonly navigationStore = inject(NavigationStore);
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
-  protected readonly canView = computed(() => this.authStore.hasPermission('menus_view'));
-  protected readonly canCreate = computed(() => this.authStore.hasPermission('menus_create'));
-  protected readonly canEdit = computed(() => this.authStore.hasPermission('menus_edit'));
+  protected readonly canView = computed(() => this.authStore.hasPermission('navigation_view'));
+  protected readonly canCreate = computed(() => this.authStore.hasPermission('navigation_create'));
+  protected readonly canEdit = computed(() => this.authStore.hasPermission('navigation_edit'));
 
   protected readonly isCreateOpen = signal(false);
 
   protected readonly columns: KkhColumnDef[] = [
     { id: 'icon', header: 'Icon', align: 'center' },
-    { id: 'name', header: 'Name', sortable: true },
-    { id: 'api_path', header: 'API Path', sortable: true },
+    { id: 'title', header: 'Title', sortable: true },
+    { id: 'route', header: 'Route', sortable: true },
+    { id: 'resource', header: 'Resource', sortable: true },
     { id: 'description', header: 'Description', sortable: true },
     { id: 'parent_id', header: 'Parent ID', sortable: true },
     { id: 'sort_order', header: 'Order', sortable: true, align: 'center' },
@@ -282,30 +296,31 @@ export class MenusComponent implements OnInit {
     { id: 'actions', header: 'Actions', align: 'right' }
   ];
 
-  protected readonly editingMenuId = signal<number | null>(null);
+  protected readonly editingItemId = signal<number | null>(null);
 
   protected readonly rootParentOption: SelectOption[] = [
-    { value: '0', label: 'Root (no parent)', description: 'Top-level menu item' }
+    { value: '0', label: 'Root (no parent)', description: 'Top-level navigation item' }
   ];
 
-  protected readonly statusMapItem = (item: { status?: string }) => ({
+  protected readonly resourceMapItem = (item: { status?: string }) => ({
     value: String(item.status ?? ''),
     label: String(item.status ?? '')
   });
 
-  protected readonly menuParentMapItem = (item: {
+  protected readonly parentMapItem = (item: {
     id?: number;
-    name?: string | null;
-    api_path?: string;
+    title?: string | null;
+    route?: string;
   }) => ({
     value: String(item.id ?? ''),
-    label: item.name || `Menu #${item.id}`,
-    description: item.api_path
+    label: item.title || `Item #${item.id}`,
+    description: item.route
   });
 
-  protected readonly menuForm = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    api_path: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+  protected readonly navForm = new FormGroup({
+    title: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    route: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    resource: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     icon: new FormControl<string>('', { nonNullable: true }),
     description: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     parent_id: new FormControl('0', { nonNullable: true, validators: [Validators.required] }),
@@ -316,36 +331,38 @@ export class MenusComponent implements OnInit {
 
   ngOnInit() {
     if (this.canView()) {
-      this.menusStore.loadMenus();
+      this.navigationStore.loadItems();
     }
   }
 
   protected onPage(event: { pageIndex: number; pageSize: number }): void {
-    this.menusStore.setPage(event.pageIndex, event.pageSize);
+    this.navigationStore.setPage(event.pageIndex, event.pageSize);
   }
 
   protected onSort(event: { field: string; multi: boolean }): void {
-    this.menusStore.toggleSort(event.field as keyof MenusTable, event.multi);
+    this.navigationStore.toggleSort(event.field as keyof NavigationItemTable, event.multi);
   }
 
-  protected openCreateModal(menu?: MenusTable): void {
-    if (menu) {
-      this.editingMenuId.set(menu.id);
-      this.menuForm.reset({
-        name: menu.name || '',
-        api_path: menu.api_path,
-        icon: menu.icon || '',
-        description: menu.description,
-        parent_id: String(menu.parent_id ?? 0),
-        sort_order: menu.sort_order,
-        is_active: menu.is_active,
-        is_visible: menu.is_visible
+  protected openCreateModal(item?: NavigationItemTable): void {
+    if (item) {
+      this.editingItemId.set(item.id);
+      this.navForm.reset({
+        title: item.title || '',
+        route: item.route,
+        resource: item.resource || '',
+        icon: item.icon || '',
+        description: item.description,
+        parent_id: String(item.parent_id ?? 0),
+        sort_order: item.sort_order,
+        is_active: item.is_active,
+        is_visible: item.is_visible
       });
     } else {
-      this.editingMenuId.set(null);
-      this.menuForm.reset({
-        name: '',
-        api_path: '',
+      this.editingItemId.set(null);
+      this.navForm.reset({
+        title: '',
+        route: '',
+        resource: '',
         icon: '',
         description: '',
         parent_id: '0',
@@ -362,41 +379,35 @@ export class MenusComponent implements OnInit {
   }
 
   protected onModalClose(): void {
-    this.menuForm.reset();
+    this.navForm.reset();
     this.isCreateOpen.set(false);
   }
 
   protected onCreateSubmit(): void {
-    if (this.menuForm.invalid) {
-      this.menuForm.markAllAsTouched();
+    if (this.navForm.invalid) {
+      this.navForm.markAllAsTouched();
       return;
     }
 
-    const formVal = this.menuForm.getRawValue();
-    const editId = this.editingMenuId();
+    const formVal = this.navForm.getRawValue();
+    const editId = this.editingItemId();
+
+    const payload = {
+      title: formVal.title,
+      route: formVal.route,
+      resource: formVal.resource || null,
+      icon: formVal.icon || null,
+      description: formVal.description,
+      parent_id: Number(formVal.parent_id),
+      sort_order: Number(formVal.sort_order),
+      is_active: formVal.is_active,
+      is_visible: formVal.is_visible
+    };
 
     if (editId) {
-      this.menusStore.editMenu(editId, {
-        name: formVal.name || null,
-        api_path: formVal.api_path,
-        icon: formVal.icon || null,
-        description: formVal.description,
-        parent_id: Number(formVal.parent_id),
-        sort_order: Number(formVal.sort_order),
-        is_active: formVal.is_active,
-        is_visible: formVal.is_visible
-      });
+      this.navigationStore.editItem(editId, payload);
     } else {
-      this.menusStore.addMenu({
-        name: formVal.name || null,
-        api_path: formVal.api_path,
-        icon: formVal.icon || null,
-        description: formVal.description,
-        parent_id: Number(formVal.parent_id),
-        sort_order: Number(formVal.sort_order),
-        is_active: formVal.is_active,
-        is_visible: formVal.is_visible
-      });
+      this.navigationStore.addItem(payload);
     }
 
     this.closeCreateModal();

@@ -26,11 +26,11 @@ export class NavMenuService {
     this.loadError.set(null);
     try {
       const rows = await firstValueFrom(
-        this.http.get<NavigationMenuDto[]>('/menus/navigation')
+        this.http.get<NavigationMenuDto[]>('/navigation/sidebar')
       );
       this.remoteItems.set((rows ?? []).map(mapNavigationMenu));
     } catch {
-      this.loadError.set('Failed to load navigation menus.');
+      this.loadError.set('Failed to load navigation.');
       this.remoteItems.set([]);
     } finally {
       this.loading.set(false);

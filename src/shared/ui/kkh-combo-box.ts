@@ -84,7 +84,7 @@ export class KkhComboBoxComponent implements ControlValueAccessor {
   readonly mapItem = input<(item: any) => SelectOption>((item) => ({
     value: String(item.id ?? item.status ?? item.value),
     label: String(item.name ?? item.label ?? item.status ?? item.id),
-    description: item.description ?? item.api_path ?? undefined
+    description: item.description ?? item.route ?? item.api_path ?? undefined
   }));
   readonly error = input<string | null>(null);
 

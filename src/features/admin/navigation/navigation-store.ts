@@ -4,22 +4,22 @@ import { HttpClient } from '@angular/common/http';
 import { lastValueFrom } from 'rxjs';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { createDebouncedTask, SEARCH_DEBOUNCE_MS } from '../../../shared/util/debounce';
-import { MenusTable } from '../../../types/database';
+import { NavigationItemTable } from '../../../types/database';
 
-export interface MenusState {
-  menus: MenusTable[];
-  totalMenusCount: number;
+export interface NavigationState {
+  items: NavigationItemTable[];
+  totalCount: number;
   filterText: string;
   pageIndex: number;
   pageSize: number;
-  sorts: Array<{ field: keyof MenusTable; direction: 'asc' | 'desc' }>;
+  sorts: Array<{ field: keyof NavigationItemTable; direction: 'asc' | 'desc' }>;
   isLoading: boolean;
   error: string | null;
 }
 
-const initialState: MenusState = {
-  menus: [],
-  totalMenusCount: 0,
+const initialState: NavigationState = {
+  items: [],
+  totalCount: 0,
   filterText: '',
   pageIndex: 0,
   pageSize: 5,
@@ -28,12 +28,12 @@ const initialState: MenusState = {
   error: null
 };
 
-export const MenusStore = signalStore(
+export const NavigationStore = signalStore(
   withState(initialState),
   withMethods((store, http = inject(HttpClient), toast = inject(ToastService)) => {
     const debouncedSearch = createDebouncedTask(SEARCH_DEBOUNCE_MS);
 
-    const loadMenus = async (background: boolean = false) => {
+    const loadItems = async (background: boolean = false) => {
       if (!background) {
         patchState(store, { isLoading: true, error: null });
       } else {
@@ -47,11 +47,11 @@ export const MenusStore = signalStore(
           pageSize: store.pageSize()
         };
         const response = await lastValueFrom(
-          http.post<{ items: MenusTable[]; metadata: { totalCount: number } }>('/menus/list', payload)
+          http.post<{ items: NavigationItemTable[]; metadata: { totalCount: number } }>('/navigation/list', payload)
         );
         patchState(store, {
-          menus: response.items,
-          totalMenusCount: response.metadata.totalCount,
+          items: response.items,
+          totalCount: response.metadata.totalCount,
           isLoading: false
         });
       } catch (err: any) {
@@ -60,22 +60,22 @@ export const MenusStore = signalStore(
     };
 
     return {
-      pagedMenus: computed(() => store.menus()),
+      pagedItems: computed(() => store.items()),
 
       setFilterText(text: string): void {
         patchState(store, { filterText: text, pageIndex: 0 });
-        debouncedSearch.schedule(() => loadMenus(true));
+        debouncedSearch.schedule(() => loadItems(true));
       },
 
       setPage(index: number, size: number): void {
         patchState(store, { pageIndex: index, pageSize: size });
-        void loadMenus(true);
+        void loadItems(true);
       },
 
-      toggleSort(field: keyof MenusTable, multi: boolean = false): void {
+      toggleSort(field: keyof NavigationItemTable, multi: boolean = false): void {
         const current = store.sorts();
         const existing = current.find(s => s.field === field);
-        let nextSorts: Array<{ field: keyof MenusTable; direction: 'asc' | 'desc' }> = [];
+        let nextSorts: Array<{ field: keyof NavigationItemTable; direction: 'asc' | 'desc' }> = [];
 
         if (existing) {
           if (existing.direction === 'asc') {
@@ -90,35 +90,35 @@ export const MenusStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
-        void loadMenus(true);
+        void loadItems(true);
       },
 
       clearSorts(): void {
         patchState(store, { sorts: [] });
-        void loadMenus(true);
+        void loadItems(true);
       },
 
-      loadMenus,
+      loadItems,
 
-      async addMenu(menu: any) {
+      async addItem(item: Partial<NavigationItemTable>) {
         try {
-          await lastValueFrom(http.post('/menus', menu));
-          toast.success('Menu successfully created!');
-          await loadMenus(true);
+          await lastValueFrom(http.post('/navigation', item));
+          toast.success('Navigation item successfully created!');
+          await loadItems(true);
         } catch (err: any) {
-          toast.error(`Failed to create menu: ${err.message || 'Unknown error'}`);
-          console.error('Error adding menu:', err);
+          toast.error(`Failed to create navigation item: ${err.message || 'Unknown error'}`);
+          console.error('Error adding navigation item:', err);
         }
       },
 
-      async editMenu(id: number, menu: any) {
+      async editItem(id: number, item: Partial<NavigationItemTable>) {
         try {
-          await lastValueFrom(http.put(`/menus/${id}`, menu));
-          toast.success('Menu successfully updated!');
-          await loadMenus(true);
+          await lastValueFrom(http.put(`/navigation/${id}`, item));
+          toast.success('Navigation item successfully updated!');
+          await loadItems(true);
         } catch (err: any) {
-          toast.error(`Failed to update menu: ${err.message || 'Unknown error'}`);
-          console.error('Error editing menu:', err);
+          toast.error(`Failed to update navigation item: ${err.message || 'Unknown error'}`);
+          console.error('Error editing navigation item:', err);
         }
       }
     };

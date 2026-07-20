@@ -107,10 +107,10 @@ export const PermissionsStore = signalStore(
 
       async loadMenuStatuses() {
         try {
-          const menuStatuses = await lastValueFrom(http.get<MenuStatusTable[]>('/menus/statuses'));
+          const menuStatuses = await lastValueFrom(http.get<MenuStatusTable[]>('/navigation/resources'));
           patchState(store, { menuStatuses });
         } catch (err: any) {
-          console.error('Failed to load menu statuses', err);
+          console.error('Failed to load navigation resources', err);
         }
       },
 

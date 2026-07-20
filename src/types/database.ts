@@ -9,10 +9,11 @@ export interface MenuStatusTable {
   status: string;
 }
 
-export interface MenusTable {
+export interface NavigationItemTable {
   id: number;
-  name: string | null;
-  api_path: string;
+  title: string;
+  route: string;
+  resource: string | null;
   icon: string | null;
   description: string;
   parent_id: number;

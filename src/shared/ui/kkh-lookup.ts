@@ -80,7 +80,7 @@ export class KkhLookupComponent implements ControlValueAccessor {
   readonly mapItem = input<(item: any) => SelectOption>((item) => ({
     value: String(item.id ?? item.status ?? item.value),
     label: String(item.name ?? item.status ?? item.label ?? item.id),
-    description: item.description ?? item.api_path
+    description: item.description ?? item.route ?? item.api_path
   }));
   readonly pageSize = input(20);
   readonly error = input<string | null>(null);

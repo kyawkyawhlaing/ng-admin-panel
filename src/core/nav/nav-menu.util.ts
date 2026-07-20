@@ -1,8 +1,8 @@
 export interface NavigationMenuDto {
   id: number;
-  name: string | null;
   title: string;
-  api_path: string;
+  route: string;
+  resource?: string | null;
   icon: string | null;
   parent_id: number;
   sort_order: number;
@@ -13,12 +13,12 @@ export interface NavMenuItem {
   title: string;
   route: string;
   icon: string;
-  name?: string | null;
+  resource?: string | null;
 }
 
-/** Normalize DB api_path values to Angular admin routes. */
-export function toAdminRoute(apiPath: string): string {
-  const trimmed = (apiPath ?? '').trim();
+/** Normalize DB route values to Angular admin routes. */
+export function toAdminRoute(route: string): string {
+  const trimmed = (route ?? '').trim();
   if (!trimmed) {
     return '/admin';
   }
@@ -34,18 +34,11 @@ export function toAdminRoute(apiPath: string): string {
 export function mapNavigationMenu(dto: NavigationMenuDto): NavMenuItem {
   return {
     id: dto.id,
-    title: dto.title || titleFromName(dto.name),
-    route: toAdminRoute(dto.api_path),
-    icon: (dto.icon || 'menu').toLowerCase(),
-    name: dto.name
+    title: dto.title || 'Untitled',
+    route: toAdminRoute(dto.route),
+    icon: (dto.icon || 'layout').toLowerCase(),
+    resource: dto.resource
   };
-}
-
-function titleFromName(name: string | null | undefined): string {
-  if (!name) {
-    return 'Untitled';
-  }
-  return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
 }
 
 export const DASHBOARD_NAV_ITEM: NavMenuItem = {
@@ -53,5 +46,5 @@ export const DASHBOARD_NAV_ITEM: NavMenuItem = {
   title: 'Dashboard',
   route: '/admin/dashboard',
   icon: 'layout-dashboard',
-  name: 'dashboard'
+  resource: 'dashboard'
 };

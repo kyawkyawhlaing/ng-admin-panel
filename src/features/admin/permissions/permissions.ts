@@ -4,7 +4,7 @@ import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
 import { merge } from 'rxjs';
 import { AdminStore, AdminStoreType } from '../admin-store';
 import { PermissionsStore } from './permissions-store';
-import { MenusStore } from '../menus/menus-store';
+import { NavigationStore } from '../navigation/navigation-store';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import {
   KkhPageHeaderComponent,
@@ -20,7 +20,7 @@ import {
   KkhColumnDef
 } from '../../../shared/ui';
 import { PermissionsTable, ActionStatus } from '../../../types/database';
-import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon, Edit } from 'lucide-angular';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon, Edit, Layout } from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-permissions',
@@ -41,11 +41,11 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
   ],
   providers: [
     PermissionsStore,
-    MenusStore,
+    NavigationStore,
     {
       provide: LUCIDE_ICONS,
       multi: true,
-      useValue: new LucideIconProvider({ Menu: MenuIcon, Edit })
+      useValue: new LucideIconProvider({ Menu: MenuIcon, Edit, Layout })
     }
   ],
   template: `
@@ -122,12 +122,12 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
             [class.kkh-relation-summary--empty]="count === 0"
             [disabled]="!canEdit()"
             (click)="canEdit() && openAssignDialog(row.id.toString())"
-            [attr.aria-label]="count === 0 ? 'Assign menus' : 'Manage ' + count + ' menus'"
-            [title]="count === 0 ? 'Visible to all — click to restrict menus' : count + ' menus linked — click to manage'"
+            [attr.aria-label]="count === 0 ? 'Assign navigation' : 'Manage ' + count + ' navigation items'"
+            [title]="count === 0 ? 'Visible to all — click to restrict navigation' : count + ' navigation items linked — click to manage'"
           >
             <span class="kkh-relation-summary__count">
               <span class="kkh-relation-summary__label">
-                {{ count === 0 ? 'All menus' : count + (count === 1 ? ' menu' : ' menus') }}
+                {{ count === 0 ? 'All navigation' : count + (count === 1 ? ' item' : ' items') }}
               </span>
               @if (canEdit()) {
                 <span class="kkh-relation-summary__icon" aria-hidden="true">
@@ -148,9 +148,9 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
               type="button"
               (click)="openAssignDialog(row.id.toString())"
               class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
-              title="Assign Menus"
+              title="Assign Navigation"
             >
-              <lucide-icon name="menu" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
+              <lucide-icon name="layout" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
             </button>
             <button
               type="button"
@@ -169,7 +169,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
     <kkh-transfer
       [open]="isDialogOpen()"
       [title]="dialogTitle()"
-      [subtitle]="'Bind side menus that require permission ' + activePermission()?.name"
+      [subtitle]="'Bind navigation items that require permission ' + activePermission()?.name"
       [allItems]="dialogOptions()"
       [assignedItemIds]="assignedMenuIds()"
       (assigned)="onMenusAssigned($event)"
@@ -203,7 +203,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
           label="Resource"
           formControlName="resource"
           placeholder="Select a resource..."
-          endpoint="/menus/statuses/list"
+          endpoint="/navigation/resources/list"
           [mapItem]="statusMapItem"
           [error]="permissionForm.get('resource')?.hasError('required') && permissionForm.get('resource')?.touched ? 'Resource is required' : null"
         />
@@ -228,7 +228,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
 export class PermissionsComponent implements OnInit {
   protected readonly adminStore = inject(AdminStore) as unknown as AdminStoreType;
   protected readonly permissionsStore = inject(PermissionsStore);
-  protected readonly menusStore = inject(MenusStore);
+  protected readonly navigationStore = inject(NavigationStore);
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
   protected readonly canView = computed(() => this.authStore.hasPermission('permissions_view'));
@@ -243,7 +243,7 @@ export class PermissionsComponent implements OnInit {
     { id: 'action', header: 'Action', sortable: true },
     { id: 'resource', header: 'Resource', sortable: true },
     { id: 'description', header: 'Description', sortable: true },
-    { id: 'menus', header: 'Menus' },
+    { id: 'menus', header: 'Navigation' },
     { id: 'actions', header: 'Actions', align: 'right' }
   ];
 
@@ -258,19 +258,19 @@ export class PermissionsComponent implements OnInit {
   });
 
   protected readonly dialogTitle = computed(() =>
-    this.activePermission() ? `Assign Menus for ${this.activePermission()!.name}` : 'Assign Menus'
+    this.activePermission() ? `Assign Navigation for ${this.activePermission()!.name}` : 'Assign Navigation'
   );
 
   protected readonly dialogOptions = computed(() => {
     const perm = this.activePermission();
     if (!perm || !perm.resource) return [];
 
-    return this.menusStore.menus()
-      .filter(m => m.name === perm.resource)
+    return this.navigationStore.items()
+      .filter(m => m.resource === perm.resource)
       .map(m => ({
         id: m.id.toString(),
-        name: m.name || 'Unnamed',
-        description: m.api_path
+        name: m.title || 'Untitled',
+        description: m.route
       }));
   });
 
@@ -321,7 +321,7 @@ export class PermissionsComponent implements OnInit {
     if (this.canView()) {
       this.permissionsStore.loadPermissions();
     }
-    this.menusStore.loadMenus();
+    this.navigationStore.loadItems();
   }
 
   protected onPage(event: { pageIndex: number; pageSize: number }): void {

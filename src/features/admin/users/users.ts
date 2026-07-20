@@ -23,8 +23,17 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
   const password = control.get('password');
   const confirmPassword = control.get('confirmPassword');
   if (!password || !confirmPassword) return null;
+  // Optional password on edit: both empty is fine.
+  if (!password.value && !confirmPassword.value) return null;
   return password.value === confirmPassword.value ? null : { passwordMismatch: true };
 };
+
+const passwordComplexityValidators = [
+  Validators.required,
+  Validators.minLength(8),
+  Validators.pattern(/^(?=.*[A-Z])(?=.*[0-9])(?=.*[\W_]).+$/)
+];
+
 
 @Component({
   selector: 'app-admin-users',
@@ -250,7 +259,15 @@ const passwordMatchValidator: ValidatorFn = (control: AbstractControl): Validati
             [label]="editingUserId() ? 'New Password (Optional)' : 'Password'"
             type="password"
             formControlName="password"
-            [error]="userForm.get('password')?.hasError('required') && userForm.get('password')?.touched ? 'Password is required' : userForm.get('password')?.hasError('minlength') && userForm.get('password')?.touched ? 'Password must be at least 6 characters' : null"
+            [error]="
+              userForm.get('password')?.touched && userForm.get('password')?.hasError('required')
+                ? 'Password is required'
+                : userForm.get('password')?.touched && userForm.get('password')?.hasError('minlength')
+                  ? 'Password must be at least 8 characters'
+                  : userForm.get('password')?.touched && userForm.get('password')?.hasError('pattern')
+                    ? 'Use upper case, a number, and a special character'
+                    : null
+            "
           />
 
           <kkh-input
@@ -370,7 +387,7 @@ export class UsersComponent implements OnInit {
     last_name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     display_name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     email: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.email] }),
-    password: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(6)] }),
+    password: new FormControl('', { nonNullable: true, validators: passwordComplexityValidators }),
     confirmPassword: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     lockout_enabled: new FormControl(true, { nonNullable: true }),
     two_factor_enabled: new FormControl(false, { nonNullable: true }),
@@ -440,7 +457,10 @@ export class UsersComponent implements OnInit {
         two_factor_enabled: user.two_factor_enabled,
         first_time_login: user.first_time_login || true
       });
-      this.userForm.get('password')?.clearValidators();
+      this.userForm.get('password')?.setValidators([
+        Validators.minLength(8),
+        Validators.pattern(/^(?=.*[A-Z])(?=.*[0-9])(?=.*[\W_]).+$|^$/)
+      ]);
       this.userForm.get('confirmPassword')?.clearValidators();
     } else {
       this.editingUserId.set(null);
@@ -455,7 +475,7 @@ export class UsersComponent implements OnInit {
         two_factor_enabled: false,
         first_time_login: true
       });
-      this.userForm.get('password')?.setValidators([Validators.required, Validators.minLength(6)]);
+      this.userForm.get('password')?.setValidators(passwordComplexityValidators);
       this.userForm.get('confirmPassword')?.setValidators([Validators.required]);
     }
     this.userForm.get('password')?.updateValueAndValidity();
@@ -472,7 +492,7 @@ export class UsersComponent implements OnInit {
     this.isCreateOpen.set(false);
   }
 
-  protected onCreateSubmit(): void {
+  protected async onCreateSubmit(): Promise<void> {
     if (this.userForm.invalid) {
       this.userForm.markAllAsTouched();
       return;
@@ -480,19 +500,27 @@ export class UsersComponent implements OnInit {
 
     const formVal = this.userForm.getRawValue();
     const editId = this.editingUserId();
+    const newPassword = (formVal.password || '').trim();
 
     if (editId) {
-      this.usersStore.editUser(editId, {
-        first_name: formVal.first_name,
-        last_name: formVal.last_name,
-        display_name: formVal.display_name,
-        email: formVal.email,
-        lockout_enabled: formVal.lockout_enabled,
-        two_factor_enabled: formVal.two_factor_enabled,
-        first_time_login: formVal.first_time_login
-      });
+      const ok = await this.usersStore.editUser(
+        editId,
+        {
+          first_name: formVal.first_name,
+          last_name: formVal.last_name,
+          display_name: formVal.display_name,
+          email: formVal.email,
+          lockout_enabled: formVal.lockout_enabled,
+          two_factor_enabled: formVal.two_factor_enabled,
+          first_time_login: formVal.first_time_login
+        },
+        newPassword || undefined
+      );
+      if (!ok) {
+        return;
+      }
     } else {
-      this.usersStore.addUser({
+      const ok = await this.usersStore.addUser({
         firstName: formVal.first_name,
         lastName: formVal.last_name,
         displayName: formVal.display_name,
@@ -502,6 +530,9 @@ export class UsersComponent implements OnInit {
         twoFactorEnabled: formVal.two_factor_enabled,
         firstTimeLogin: formVal.first_time_login
       });
+      if (!ok) {
+        return;
+      }
     }
 
     this.closeCreateModal();
