@@ -36,8 +36,3 @@ export interface RolePermissionMapping {
   roleId: string;
   permissionId: string;
 }
-
-export interface PermissionMenuMapping {
-  permissionId: string;
-  menuId: string;
-}

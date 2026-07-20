@@ -329,9 +329,9 @@ export class NavigationComponent implements OnInit {
     { value: '0', label: 'Root (no parent)', description: 'Top-level navigation item' }
   ];
 
-  protected readonly resourceMapItem = (item: { status?: string }) => ({
-    value: String(item.status ?? ''),
-    label: String(item.status ?? '')
+  protected readonly resourceMapItem = (item: { name?: string }) => ({
+    value: String(item.name ?? ''),
+    label: String(item.name ?? '')
   });
 
   protected readonly parentMapItem = (item: {

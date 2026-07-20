@@ -4,11 +4,11 @@ import { HttpClient } from '@angular/common/http';
 import { lastValueFrom } from 'rxjs';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { createDebouncedTask, SEARCH_DEBOUNCE_MS } from '../../../shared/util/debounce';
-import { PermissionsTable, MenuStatusTable } from '../../../types/database';
+import { PermissionsTable, ResourceTable } from '../../../types/database';
 
 export interface PermissionsState {
   permissions: PermissionsTable[];
-  menuStatuses: MenuStatusTable[];
+  resources: ResourceTable[];
   totalPermissionsCount: number;
   filterText: string;
   pageIndex: number;
@@ -20,7 +20,7 @@ export interface PermissionsState {
 
 const initialState: PermissionsState = {
   permissions: [],
-  menuStatuses: [],
+  resources: [],
   totalPermissionsCount: 0,
   filterText: '',
   pageIndex: 0,
@@ -105,12 +105,12 @@ export const PermissionsStore = signalStore(
 
       loadPermissions,
 
-      async loadMenuStatuses() {
+      async loadResources() {
         try {
-          const menuStatuses = await lastValueFrom(http.get<MenuStatusTable[]>('/navigation/resources'));
-          patchState(store, { menuStatuses });
+          const resources = await lastValueFrom(http.get<ResourceTable[]>('/navigation/resources'));
+          patchState(store, { resources });
         } catch (err: any) {
-          console.error('Failed to load navigation resources', err);
+          console.error('Failed to load resources', err);
         }
       },
 

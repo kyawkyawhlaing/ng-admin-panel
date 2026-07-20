@@ -82,7 +82,7 @@ export class KkhComboBoxComponent implements ControlValueAccessor {
   /** When set, loads options from POST endpoint using ListQuery.searchTerm */
   readonly endpoint = input<string | null>(null);
   readonly mapItem = input<(item: any) => SelectOption>((item) => ({
-    value: String(item.id ?? item.status ?? item.value),
+    value: String(item.id ?? item.name ?? item.status ?? item.value),
     label: String(item.name ?? item.label ?? item.status ?? item.id),
     description: item.description ?? item.route ?? item.api_path ?? undefined
   }));

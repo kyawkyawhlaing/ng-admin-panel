@@ -1,12 +1,7 @@
 export type ActionStatus = 'access' | 'create' | 'delete' | 'edit' | 'view';
 
-export interface PermissionsMenusTable {
-  permission_id: number;
-  menu_id: number;
-}
-
-export interface MenuStatusTable {
-  status: string;
+export interface ResourceTable {
+  name: string;
 }
 
 export interface NavigationItemTable {

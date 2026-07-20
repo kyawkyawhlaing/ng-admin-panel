@@ -78,7 +78,7 @@ export class KkhLookupComponent implements ControlValueAccessor {
   readonly placeholder = input('Lookup…');
   readonly endpoint = input.required<string>();
   readonly mapItem = input<(item: any) => SelectOption>((item) => ({
-    value: String(item.id ?? item.status ?? item.value),
+    value: String(item.id ?? item.name ?? item.status ?? item.value),
     label: String(item.name ?? item.status ?? item.label ?? item.id),
     description: item.description ?? item.route ?? item.api_path
   }));

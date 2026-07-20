@@ -3,7 +3,7 @@ import { computed, Signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { lastValueFrom } from 'rxjs';
 import { withCallState, setLoading, setLoaded, setError, CallState } from '../../core/stores/features/with-call-state';
-import { User, Role, Permission, Menu, UserRoleMapping, RolePermissionMapping, PermissionMenuMapping } from '../../types/rbac';
+import { User, Role, Permission, Menu, UserRoleMapping, RolePermissionMapping } from '../../types/rbac';
 
 export interface AdminState {
   users: User[];
@@ -12,7 +12,6 @@ export interface AdminState {
   menus: Menu[];
   userRoles: UserRoleMapping[];
   rolePermissions: RolePermissionMapping[];
-  permissionMenus: PermissionMenuMapping[];
 }
 
 const initialAdminState: AdminState = {
@@ -53,12 +52,6 @@ const initialAdminState: AdminState = {
     { roleId: 'r3', permissionId: 'p3' },
     { roleId: 'r3', permissionId: 'p4' },
     { roleId: 'r3', permissionId: 'p5' }
-  ],
-  permissionMenus: [
-    { permissionId: 'p1', menuId: 'm2' }, // Read Users -> Users Menu
-    { permissionId: 'p3', menuId: 'm3' }, // Read Roles -> Roles Menu
-    { permissionId: 'p5', menuId: 'm4' }, // Read Permissions -> Permissions Menu
-    { permissionId: 'p6', menuId: 'm5' }  // Read Navigation -> Navigation
   ]
 };
 
@@ -117,18 +110,11 @@ export const AdminStore = signalStore(
           const rolePermMappings = await lastValueFrom(http.get<{roleId: number, permissionId: number}[]>('/roles/permissions-mapping'));
           const formattedRolePerms = rolePermMappings.map(m => ({ roleId: m.roleId.toString(), permissionId: m.permissionId.toString() }));
 
-          const permMenuMappings = await lastValueFrom(http.get<{permissionId: number, menuId: number}[]>('/permissions/menus-mapping'));
-          const formattedPermMenus = permMenuMappings.map(m => ({
-            permissionId: m.permissionId.toString(),
-            menuId: m.menuId.toString()
-          }));
-
           patchState(store, {
             roles: backendRoles,
             permissions: backendPermissions,
             userRoles: formatted,
-            rolePermissions: formattedRolePerms,
-            permissionMenus: formattedPermMenus
+            rolePermissions: formattedRolePerms
           });
         } catch (err) {
           console.error("Error loading real data for admin store", err);
@@ -191,45 +177,6 @@ export const AdminStore = signalStore(
         }
       },
 
-      // Permissions to Menus Mappings CRUD
-      async assignMenuToPermission(permissionId: string, menuId: string): Promise<void> {
-        patchState(store, setLoading());
-        try {
-          const numPermissionId = parseInt(permissionId, 10);
-          const numMenuId = parseInt(menuId, 10);
-          await lastValueFrom(http.post('/permissions/assign-menus', {
-            permissionId: numPermissionId,
-            menuId: numMenuId
-          }));
-          const updated = [...store.permissionMenus(), { permissionId, menuId }];
-          patchState(store, { permissionMenus: updated });
-          patchState(store, setLoaded());
-        } catch (err: any) {
-          patchState(store, setError(err.message));
-          throw err;
-        }
-      },
-
-      async removeMenuFromPermission(permissionId: string, menuId: string): Promise<void> {
-        patchState(store, setLoading());
-        try {
-          const numPermissionId = parseInt(permissionId, 10);
-          const numMenuId = parseInt(menuId, 10);
-          await lastValueFrom(http.post('/permissions/remove-menus', {
-            permissionId: numPermissionId,
-            menuId: numMenuId
-          }));
-          const updated = store.permissionMenus().filter(
-            m => !(m.permissionId === permissionId && m.menuId === menuId)
-          );
-          patchState(store, { permissionMenus: updated });
-          patchState(store, setLoaded());
-        } catch (err: any) {
-          patchState(store, setError(err.message));
-          throw err;
-        }
-      },
-
       // Entity queries (convenient accessor methods)
       getRolesForUser(userId: string): Role[] {
         const roleIds = store.userRoles()
@@ -243,13 +190,6 @@ export const AdminStore = signalStore(
           .filter(m => m.roleId === roleId)
           .map(m => m.permissionId);
         return store.permissions().filter(p => permIds.includes(p.id));
-      },
-
-      getMenusForPermission(permissionId: string): Menu[] {
-        const menuIds = store.permissionMenus()
-          .filter(m => m.permissionId === permissionId)
-          .map(m => m.menuId);
-        return store.menus().filter(m => menuIds.includes(m.id));
       }
     };
   })
@@ -262,7 +202,6 @@ export interface AdminStoreType {
   readonly menus: Signal<Menu[]>;
   readonly userRoles: Signal<UserRoleMapping[]>;
   readonly rolePermissions: Signal<RolePermissionMapping[]>;
-  readonly permissionMenus: Signal<PermissionMenuMapping[]>;
   readonly callState: Signal<CallState>;
   readonly isLoading: Signal<boolean>;
   readonly isLoaded: Signal<boolean>;
@@ -272,12 +211,9 @@ export interface AdminStoreType {
   removeRoleFromUser(userId: string, roleId: string): Promise<void>;
   assignPermissionToRole(roleId: string, permissionId: string): Promise<void>;
   removePermissionFromRole(roleId: string, permissionId: string): Promise<void>;
-  assignMenuToPermission(permissionId: string, menuId: string): Promise<void>;
-  removeMenuFromPermission(permissionId: string, menuId: string): Promise<void>;
 
   loadRealData(): Promise<void>;
 
   getRolesForUser(userId: string): Role[];
   getPermissionsForRole(roleId: string): Permission[];
-  getMenusForPermission(permissionId: string): Menu[];
 }

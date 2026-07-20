@@ -4,7 +4,6 @@ import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } 
 import { merge } from 'rxjs';
 import { AdminStore, AdminStoreType } from '../admin-store';
 import { PermissionsStore } from './permissions-store';
-import { NavigationStore } from '../navigation/navigation-store';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import {
   KkhPageHeaderComponent,
@@ -15,7 +14,6 @@ import {
   KkhComboBoxComponent,
   KkhDataTableComponent,
   KkhCellDefDirective,
-  KkhTransferComponent,
   KkhDialogComponent,
   KkhColumnDef
 } from '../../../shared/ui';
@@ -36,13 +34,11 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
     KkhComboBoxComponent,
     KkhDataTableComponent,
     KkhCellDefDirective,
-    KkhTransferComponent,
     KkhDialogComponent,
     LucideAngularModule
   ],
   providers: [
     PermissionsStore,
-    NavigationStore,
     {
       provide: LUCIDE_ICONS,
       multi: true,
@@ -54,7 +50,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
       <kkh-page-header
         eyebrow="ACCESS"
         title="Permissions"
-        description="Fine-grained action grants mapped to resources."
+        description="Fine-grained action grants. Page visibility uses {resource}_access; APIs use view/create/edit/delete."
       >
         @if (canCreate()) {
           <kkh-button variant="primary" (pressed)="openCreateModal()">+ Create Permission</kkh-button>
@@ -115,44 +111,17 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
           <span class="text-[var(--kkh-muted)]">{{ row.resource || '-' }}</span>
         </ng-template>
 
-        <ng-template kkhCell="menus" let-row>
-          @let count = getPermissionMenuCount(row.id.toString());
-          <button
-            type="button"
-            class="kkh-relation-summary"
-            [class.kkh-relation-summary--empty]="count === 0"
-            [disabled]="!canEdit()"
-            (click)="canEdit() && openAssignDialog(row.id.toString())"
-            [attr.aria-label]="count === 0 ? 'Assign navigation' : 'Manage ' + count + ' navigation items'"
-            [title]="count === 0 ? 'Visible to all — click to restrict navigation' : count + ' navigation items linked — click to manage'"
-          >
-            <span class="kkh-relation-summary__count">
-              <span class="kkh-relation-summary__label">
-                {{ count === 0 ? 'All navigation' : count + (count === 1 ? ' item' : ' items') }}
-              </span>
-              @if (canEdit()) {
-                <span class="kkh-relation-summary__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
-                </span>
-              }
-            </span>
-          </button>
-        </ng-template>
-
         <ng-template kkhCell="actions" let-row>
           <div class="flex items-center justify-end gap-3">
             @if (canEdit()) {
-            <button
-              type="button"
-              (click)="openCreateModal(row)"
-              class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
-              title="Edit Permission"
-            >
-              <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
-            </button>
+              <button
+                type="button"
+                (click)="openCreateModal(row)"
+                class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
+                title="Edit Permission"
+              >
+                <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
+              </button>
             }
             @if (canDelete() && !isProtectedPermissionRow(row)) {
               <button
@@ -168,16 +137,6 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
         </ng-template>
       </kkh-data-table>
     </div>
-
-    <kkh-transfer
-      [open]="isDialogOpen()"
-      [title]="dialogTitle()"
-      [subtitle]="'Bind navigation items that require permission ' + activePermission()?.name"
-      [allItems]="dialogOptions()"
-      [assignedItemIds]="assignedMenuIds()"
-      (assigned)="onMenusAssigned($event)"
-      (closed)="closeAssignDialog()"
-    />
 
     <kkh-dialog
       [open]="isCreateOpen()"
@@ -207,7 +166,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
           formControlName="resource"
           placeholder="Select a resource..."
           endpoint="/navigation/resources/list"
-          [mapItem]="statusMapItem"
+          [mapItem]="resourceMapItem"
           [error]="permissionForm.get('resource')?.hasError('required') && permissionForm.get('resource')?.touched ? 'Resource is required' : null"
         />
 
@@ -242,7 +201,6 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
 export class PermissionsComponent implements OnInit {
   protected readonly adminStore = inject(AdminStore) as unknown as AdminStoreType;
   protected readonly permissionsStore = inject(PermissionsStore);
-  protected readonly navigationStore = inject(NavigationStore);
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
   protected readonly canView = computed(() => this.authStore.hasPermission('permissions_view'));
@@ -254,6 +212,7 @@ export class PermissionsComponent implements OnInit {
   protected readonly isDeleteOpen = signal(false);
   protected readonly isDeleting = signal(false);
   protected readonly deleteTarget = signal<PermissionsTable | null>(null);
+  protected readonly editingPermissionId = signal<number | null>(null);
 
   protected readonly columns: KkhColumnDef[] = [
     { id: 'id', header: 'ID', sortable: true },
@@ -261,48 +220,12 @@ export class PermissionsComponent implements OnInit {
     { id: 'action', header: 'Action', sortable: true },
     { id: 'resource', header: 'Resource', sortable: true },
     { id: 'description', header: 'Description', sortable: true },
-    { id: 'menus', header: 'Navigation' },
     { id: 'actions', header: 'Actions', align: 'right' }
   ];
 
-  protected readonly activePermissionId = signal<string | null>(null);
-  protected readonly isDialogOpen = signal(false);
-  protected readonly editingPermissionId = signal<number | null>(null);
-
-  protected readonly activePermission = computed(() => {
-    const permId = this.activePermissionId();
-    if (!permId) return null;
-    return this.permissionsStore.permissions().find(p => p.id.toString() === permId) || null;
-  });
-
-  protected readonly dialogTitle = computed(() =>
-    this.activePermission() ? `Assign Navigation for ${this.activePermission()!.name}` : 'Assign Navigation'
-  );
-
-  protected readonly dialogOptions = computed(() => {
-    const perm = this.activePermission();
-    if (!perm || !perm.resource) return [];
-
-    return this.navigationStore.items()
-      .filter(m => m.resource === perm.resource)
-      .map(m => ({
-        id: m.id.toString(),
-        name: m.title || 'Untitled',
-        description: m.route
-      }));
-  });
-
-  protected readonly assignedMenuIds = computed(() => {
-    const permissionId = this.activePermissionId();
-    if (!permissionId) return [];
-    return this.adminStore.permissionMenus()
-      .filter(pm => pm.permissionId === permissionId)
-      .map(pm => pm.menuId.toString());
-  });
-
-  protected readonly statusMapItem = (item: { status?: string }) => ({
-    value: String(item.status ?? ''),
-    label: String(item.status ?? '')
+  protected readonly resourceMapItem = (item: { name?: string }) => ({
+    value: String(item.name ?? ''),
+    label: String(item.name ?? '')
   });
 
   protected readonly actionMapItem = (item: { value?: string; label?: string }) => ({
@@ -322,24 +245,23 @@ export class PermissionsComponent implements OnInit {
       this.permissionForm.controls.action.valueChanges,
       this.permissionForm.controls.resource.valueChanges
     )
-    .pipe(takeUntilDestroyed())
-    .subscribe(() => {
-      const action = this.permissionForm.controls.action.value;
-      const resource = this.permissionForm.controls.resource.value;
-      if (action && resource) {
-        const expectedName = `${resource}_${action}`;
-        if (this.permissionForm.controls.name.value !== expectedName) {
-          this.permissionForm.controls.name.setValue(expectedName);
+      .pipe(takeUntilDestroyed())
+      .subscribe(() => {
+        const action = this.permissionForm.controls.action.value;
+        const resource = this.permissionForm.controls.resource.value;
+        if (action && resource) {
+          const expectedName = `${resource}_${action}`;
+          if (this.permissionForm.controls.name.value !== expectedName) {
+            this.permissionForm.controls.name.setValue(expectedName);
+          }
         }
-      }
-    });
+      });
   }
 
   ngOnInit() {
     if (this.canView()) {
       this.permissionsStore.loadPermissions();
     }
-    this.navigationStore.loadItems();
   }
 
   protected onPage(event: { pageIndex: number; pageSize: number }): void {
@@ -350,45 +272,8 @@ export class PermissionsComponent implements OnInit {
     this.permissionsStore.toggleSort(event.field as keyof PermissionsTable, event.multi);
   }
 
-  protected getPermissionMenuCount(permissionId: string): number {
-    return this.adminStore.permissionMenus().filter(pm => pm.permissionId === permissionId).length;
-  }
-
   protected isProtectedPermissionRow(permission: PermissionsTable): boolean {
     return isProtectedPermission(permission.name, permission.resource);
-  }
-
-  protected openAssignDialog(permissionId: string): void {
-    this.activePermissionId.set(permissionId);
-    this.isDialogOpen.set(true);
-  }
-
-  protected closeAssignDialog(): void {
-    this.isDialogOpen.set(false);
-    this.activePermissionId.set(null);
-  }
-
-  protected async onMenusAssigned(newMenuIds: (string | number)[]): Promise<void> {
-    const permissionId = this.activePermissionId();
-    if (!permissionId) return;
-
-    const currentMenuIds = this.assignedMenuIds();
-    const newMenuIdsStr = newMenuIds.map(id => id.toString());
-    const currentMenuIdsStr = currentMenuIds.map(id => id.toString());
-
-    const menusToAdd = newMenuIdsStr.filter(id => !currentMenuIdsStr.includes(id));
-    const menusToRemove = currentMenuIdsStr.filter(id => !newMenuIdsStr.includes(id));
-
-    try {
-      for (const menuId of menusToAdd) {
-        await this.adminStore.assignMenuToPermission(permissionId, menuId);
-      }
-      for (const menuId of menusToRemove) {
-        await this.adminStore.removeMenuFromPermission(permissionId, menuId);
-      }
-    } catch (err) {
-      console.error('Error configuration menus:', err);
-    }
   }
 
   protected openCreateModal(permission?: PermissionsTable): void {

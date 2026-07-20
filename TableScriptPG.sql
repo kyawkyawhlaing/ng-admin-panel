@@ -53,28 +53,15 @@ SET default_table_access_method = heap;
 
 --
 -- TOC entry 219 (class 1259 OID 17039)
--- Name: Permissions_menus; Type: TABLE; Schema: public; Owner: postgres
+-- Name: resources; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public."Permissions_menus" (
-    permission_id integer NOT NULL,
-    menu_id integer NOT NULL
+CREATE TABLE public.resources (
+    name text NOT NULL
 );
 
 
-ALTER TABLE public."Permissions_menus" OWNER TO postgres;
-
---
--- TOC entry 220 (class 1259 OID 17044)
--- Name: menu_status; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.menu_status (
-    status text NOT NULL
-);
-
-
-ALTER TABLE public.menu_status OWNER TO postgres;
+ALTER TABLE public.resources OWNER TO postgres;
 
 --
 -- TOC entry 221 (class 1259 OID 17050)
@@ -230,23 +217,11 @@ ALTER TABLE public.users_roles OWNER TO postgres;
 --
 -- TOC entry 5065 (class 0 OID 17039)
 -- Dependencies: 219
--- Data for Name: Permissions_menus; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public."Permissions_menus" (permission_id, menu_id) FROM stdin;
-\.
-
-
---
--- TOC entry 5066 (class 0 OID 17044)
--- Dependencies: 220
--- Data for Name: menu_status; Type: TABLE DATA; Schema: public; Owner: postgres
---
-
-COPY public.menu_status (status) FROM stdin;
+COPY public.resources (name) FROM stdin;
 users
 roles
 permissions
+navigation
 \.
 
 
@@ -362,11 +337,11 @@ SELECT pg_catalog.setval('public.roles_id_seq', 2, true);
 
 --
 -- TOC entry 4896 (class 2606 OID 17117)
--- Name: menu_status menu_status_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: resources resources_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.menu_status
-    ADD CONSTRAINT menu_status_pkey PRIMARY KEY (status);
+ALTER TABLE ONLY public.resources
+    ADD CONSTRAINT resources_pkey PRIMARY KEY (name);
 
 
 --
@@ -389,18 +364,6 @@ ALTER TABLE ONLY public.permissions
 
 --
 -- TOC entry 4894 (class 2606 OID 17123)
--- Name: Permissions_menus pk_permissions_menus; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public."Permissions_menus"
-    ADD CONSTRAINT pk_permissions_menus PRIMARY KEY (permission_id, menu_id);
-
-
---
--- TOC entry 4902 (class 2606 OID 17125)
--- Name: roles pk_roles; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
 ALTER TABLE ONLY public.roles
     ADD CONSTRAINT pk_roles PRIMARY KEY (id);
 
@@ -434,17 +397,6 @@ ALTER TABLE ONLY public.users_roles
 
 --
 -- TOC entry 4892 (class 1259 OID 17132)
--- Name: ix_permissions_menus_menu_id; Type: INDEX; Schema: public; Owner: postgres
---
-
-CREATE INDEX ix_permissions_menus_menu_id ON public."Permissions_menus" USING btree (menu_id);
-
-
---
--- TOC entry 4903 (class 1259 OID 17133)
--- Name: ix_roles_permissions_permission_id; Type: INDEX; Schema: public; Owner: postgres
---
-
 CREATE INDEX ix_roles_permissions_permission_id ON public.roles_permissions USING btree (permission_id);
 
 
@@ -458,18 +410,6 @@ CREATE INDEX ix_users_roles_role_id ON public.users_roles USING btree (role_id);
 
 --
 -- TOC entry 4911 (class 2606 OID 17135)
--- Name: Permissions_menus fk_permissions_menus_permissions_permission_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public."Permissions_menus"
-    ADD CONSTRAINT fk_permissions_menus_permissions_permission_id FOREIGN KEY (permission_id) REFERENCES public.permissions(id) ON DELETE CASCADE;
-
-
---
--- TOC entry 4914 (class 2606 OID 17140)
--- Name: roles_permissions fk_roles_permissions_permissions_permission_id; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
 ALTER TABLE ONLY public.roles_permissions
     ADD CONSTRAINT fk_roles_permissions_permissions_permission_id FOREIGN KEY (permission_id) REFERENCES public.permissions(id) ON DELETE CASCADE;
 
@@ -507,7 +447,7 @@ ALTER TABLE ONLY public.users_roles
 --
 
 ALTER TABLE ONLY public.menus
-    ADD CONSTRAINT menus_name_fkey FOREIGN KEY (name) REFERENCES public.menu_status(status);
+    ADD CONSTRAINT menus_name_fkey FOREIGN KEY (name) REFERENCES public.resources(name);
 
 
 --
@@ -516,7 +456,7 @@ ALTER TABLE ONLY public.menus
 --
 
 ALTER TABLE ONLY public.permissions
-    ADD CONSTRAINT permissions_resource_fkey FOREIGN KEY (resource) REFERENCES public.menu_status(status);
+    ADD CONSTRAINT permissions_resource_fkey FOREIGN KEY (resource) REFERENCES public.resources(name);
 
 
 --
