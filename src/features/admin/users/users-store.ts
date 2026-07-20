@@ -189,6 +189,19 @@ export const UsersStore = signalStore(
           toast.error(err?.error?.detail || err?.message || 'Failed to update MFA');
           console.error('Error toggling MFA:', err);
         }
+      },
+
+      async deleteUser(userId: string): Promise<boolean> {
+        try {
+          await lastValueFrom(http.delete(`/users/${userId}`));
+          toast.success('User deleted');
+          await loadUsers(true);
+          return true;
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to delete user');
+          console.error('Error deleting user:', err);
+          return false;
+        }
       }
     };
   })

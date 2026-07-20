@@ -122,6 +122,19 @@ export const RolesStore = signalStore(
           toast.error(`Failed to update role: ${err.message || 'Unknown error'}`);
           console.error('Error editing role:', err);
         }
+      },
+
+      async deleteRole(id: number): Promise<boolean> {
+        try {
+          await lastValueFrom(http.delete(`/roles/${id}`));
+          toast.success('Role deleted');
+          await loadRoles(true);
+          return true;
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to delete role');
+          console.error('Error deleting role:', err);
+          return false;
+        }
       }
     };
   })

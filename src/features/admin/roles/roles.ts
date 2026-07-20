@@ -5,6 +5,7 @@ import { AdminStore, AdminStoreType } from '../admin-store';
 import { RolesStore } from './roles-store';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { isAccessAction, normalizeRolePermissionIds } from '../../../core/auth/permission.util';
+import { isSysAdminRole } from '../../../core/auth/system-defaults.util';
 import {
   KkhPageHeaderComponent,
   KkhButtonComponent,
@@ -17,7 +18,7 @@ import {
   KkhColumnDef
 } from '../../../shared/ui';
 import { RolesTable } from '../../../types/database';
-import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, ShieldCheck, Edit } from 'lucide-angular';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-roles',
@@ -39,7 +40,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, ShieldCheck, Edi
     {
       provide: LUCIDE_ICONS,
       multi: true,
-      useValue: new LucideIconProvider({ ShieldCheck, Edit })
+      useValue: new LucideIconProvider({ Edit, Trash2 })
     }
   ],
   template: `
@@ -131,19 +132,21 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, ShieldCheck, Edi
             @if (canEdit()) {
               <button
                 type="button"
-                (click)="openAssignDialog(row.id.toString())"
-                class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
-                title="Assign Permissions"
-              >
-                <lucide-icon name="shield-check" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
-              </button>
-              <button
-                type="button"
                 (click)="openCreateModal(row)"
                 class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
                 title="Edit Role"
               >
                 <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
+              </button>
+            }
+            @if (canDelete() && !isProtectedRole(row)) {
+              <button
+                type="button"
+                (click)="openDeleteDialog(row)"
+                class="text-[var(--kkh-danger)] hover:opacity-80 transition-opacity cursor-pointer"
+                title="Delete Role"
+              >
+                <lucide-icon name="trash-2" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
               </button>
             }
           </div>
@@ -191,6 +194,17 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, ShieldCheck, Edi
         </kkh-button>
       </div>
     </kkh-dialog>
+
+    <kkh-dialog
+      [open]="isDeleteOpen()"
+      title="Delete Role"
+      [subtitle]="deleteTarget() ? 'Permanently remove role ' + deleteTarget()!.name + '. Assigned users and permissions will be unbound. This cannot be undone.' : null"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      [confirmLoading]="isDeleting()"
+      (closed)="closeDeleteDialog()"
+      (confirmed)="confirmDelete()"
+    />
   `
 })
 export class RolesComponent implements OnInit {
@@ -201,8 +215,12 @@ export class RolesComponent implements OnInit {
   protected readonly canView = computed(() => this.authStore.hasPermission('roles_view'));
   protected readonly canCreate = computed(() => this.authStore.hasPermission('roles_create'));
   protected readonly canEdit = computed(() => this.authStore.hasPermission('roles_edit'));
+  protected readonly canDelete = computed(() => this.authStore.hasPermission('roles_delete'));
 
   protected readonly isCreateOpen = signal(false);
+  protected readonly isDeleteOpen = signal(false);
+  protected readonly isDeleting = signal(false);
+  protected readonly deleteTarget = signal<RolesTable | null>(null);
 
   protected readonly columns: KkhColumnDef[] = [
     { id: 'id', header: 'ID', sortable: true },
@@ -279,6 +297,10 @@ export class RolesComponent implements OnInit {
     return this.adminStore.getPermissionsForRole(roleId).length;
   }
 
+  protected isProtectedRole(role: RolesTable): boolean {
+    return isSysAdminRole(role.normalized_name) || isSysAdminRole(role.name);
+  }
+
   protected openAssignDialog(roleId: string): void {
     this.activeRoleId.set(roleId);
     this.isDialogOpen.set(true);
@@ -293,14 +315,45 @@ export class RolesComponent implements OnInit {
     const roleId = this.activeRoleId();
     if (!roleId) return;
 
+    const role = this.rolesStore.roles().find((r) => String(r.id) === roleId);
+    if (role && this.isProtectedRole(role)) {
+      // sysadmin always keeps full privilege — only allow adding missing permissions.
+      const currentPermissionIds = this.assignedPermissionIds();
+      const permissions = this.adminStore.permissions();
+      const normalized = normalizeRolePermissionIds(
+        newPermissionIds.map((id) => id.toString()),
+        permissions.map((p) => ({
+          id: String(p.id),
+          resource: p.resource ?? undefined,
+          action: p.action,
+          code: p.name
+        }))
+      );
+      const permsToAdd = normalized.filter((id) => !currentPermissionIds.includes(id));
+      try {
+        for (const permissionId of permsToAdd) {
+          await this.adminStore.assignPermissionToRole(roleId, permissionId);
+        }
+        await this.adminStore.loadRealData();
+        const userId = this.authStore.user()?.id;
+        if (userId && this.adminStore.userRoles().some((ur) => ur.userId === userId && ur.roleId === roleId)) {
+          await this.authStore.refreshSession();
+        }
+      } catch (err) {
+        console.error('Error configuring permissions:', err);
+        await this.adminStore.loadRealData();
+      }
+      return;
+    }
+
     const permissions = this.adminStore.permissions();
     const normalized = normalizeRolePermissionIds(
       newPermissionIds.map((id) => id.toString()),
       permissions.map((p) => ({
         id: String(p.id),
-        resource: p.resource,
+        resource: p.resource ?? undefined,
         action: p.action,
-        code: p.code
+        code: p.name
       }))
     );
 
@@ -378,5 +431,29 @@ export class RolesComponent implements OnInit {
     }
 
     this.closeCreateModal();
+  }
+
+  protected openDeleteDialog(role: RolesTable): void {
+    this.deleteTarget.set(role);
+    this.isDeleteOpen.set(true);
+  }
+
+  protected closeDeleteDialog(): void {
+    this.isDeleteOpen.set(false);
+    this.deleteTarget.set(null);
+    this.isDeleting.set(false);
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const target = this.deleteTarget();
+    if (!target) return;
+
+    this.isDeleting.set(true);
+    const ok = await this.rolesStore.deleteRole(target.id);
+    this.isDeleting.set(false);
+    if (ok) {
+      this.closeDeleteDialog();
+      await this.adminStore.loadRealData();
+    }
   }
 }

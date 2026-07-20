@@ -120,6 +120,19 @@ export const NavigationStore = signalStore(
           toast.error(`Failed to update navigation item: ${err.message || 'Unknown error'}`);
           console.error('Error editing navigation item:', err);
         }
+      },
+
+      async deleteItem(id: number): Promise<boolean> {
+        try {
+          await lastValueFrom(http.delete(`/navigation/${id}`));
+          toast.success('Navigation item deleted');
+          await loadItems(true);
+          return true;
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to delete navigation item');
+          console.error('Error deleting navigation item:', err);
+          return false;
+        }
       }
     };
   })

@@ -17,7 +17,8 @@ import {
 } from '../../../shared/ui';
 import { UsersTable } from '../../../types/database';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
-import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit } from 'lucide-angular';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } from 'lucide-angular';
+import { isProtectedAdminEmail, isSysAdminRole } from '../../../core/auth/system-defaults.util';
 
 const passwordMatchValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const password = control.get('password');
@@ -56,7 +57,7 @@ const passwordComplexityValidators = [
     {
       provide: LUCIDE_ICONS,
       multi: true,
-      useValue: new LucideIconProvider({ Edit })
+      useValue: new LucideIconProvider({ Edit, Trash2 })
     }
   ],
   template: `
@@ -153,10 +154,10 @@ const passwordComplexityValidators = [
             type="button"
             class="kkh-relation-summary"
             [class.kkh-relation-summary--empty]="!row.is_locked_out"
-            [disabled]="!canEdit()"
-            (click)="canEdit() && usersStore.toggleLockout(row.id)"
+            [disabled]="!canEdit() || isProtectedUser(row)"
+            (click)="canEdit() && !isProtectedUser(row) && usersStore.toggleLockout(row.id)"
             [attr.aria-label]="row.is_locked_out ? 'Unlock account' : 'Lock account'"
-            [title]="row.is_locked_out ? 'Locked out — click to unlock' : 'Active — click to lock'"
+            [title]="isProtectedUser(row) ? 'System administrator cannot be locked' : (row.is_locked_out ? 'Locked out — click to unlock' : 'Active — click to lock')"
           >
             <span class="kkh-relation-summary__count">
               <span class="kkh-relation-summary__label">
@@ -214,6 +215,16 @@ const passwordComplexityValidators = [
                 title="Edit User"
               >
                 <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
+              </button>
+            }
+            @if (canDelete() && row.id !== authStore.user()?.id && !isProtectedUser(row)) {
+              <button
+                type="button"
+                (click)="openDeleteDialog(row)"
+                class="text-[var(--kkh-danger)] hover:opacity-80 transition-opacity cursor-pointer"
+                title="Delete User"
+              >
+                <lucide-icon name="trash-2" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
               </button>
             }
           </div>
@@ -334,12 +345,23 @@ const passwordComplexityValidators = [
         </kkh-button>
       </div>
     </kkh-dialog>
+
+    <kkh-dialog
+      [open]="isDeleteOpen()"
+      title="Delete User"
+      [subtitle]="deleteTarget() ? 'Permanently remove ' + deleteTarget()!.display_name + ' (' + deleteTarget()!.email + '). This cannot be undone.' : null"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      [confirmLoading]="isDeleting()"
+      (closed)="closeDeleteDialog()"
+      (confirmed)="confirmDelete()"
+    />
   `
 })
 export class UsersComponent implements OnInit {
   protected readonly usersStore = inject(UsersStore);
   protected readonly adminStore = inject(AdminStore) as unknown as AdminStoreType;
-  private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
+  protected readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
   protected readonly canView = computed(() => this.authStore.hasPermission('users_view'));
   protected readonly canCreate = computed(() => this.authStore.hasPermission('users_create'));
@@ -347,6 +369,9 @@ export class UsersComponent implements OnInit {
   protected readonly canDelete = computed(() => this.authStore.hasPermission('users_delete'));
 
   protected readonly isCreateOpen = signal(false);
+  protected readonly isDeleteOpen = signal(false);
+  protected readonly isDeleting = signal(false);
+  protected readonly deleteTarget = signal<UsersTable | null>(null);
 
   protected readonly columns: KkhColumnDef[] = [
     { id: 'display_name', header: 'Display Name', sortable: true },
@@ -429,6 +454,10 @@ export class UsersComponent implements OnInit {
     return this.adminStore.getRolesForUser(userId).length;
   }
 
+  protected isProtectedUser(user: UsersTable): boolean {
+    return isProtectedAdminEmail(user.email);
+  }
+
   protected openAssignDialog(userId: string): void {
     this.activeUserId.set(userId);
     this.isAssignDialogOpen.set(true);
@@ -443,9 +472,17 @@ export class UsersComponent implements OnInit {
     const userId = this.activeUserId();
     if (!userId) return;
 
+    const user = this.usersStore.users().find((u) => u.id === userId);
     const currentRoleIds = this.assignedRoleIds();
     const rolesToAdd = newRoleIds.filter(id => !currentRoleIds.includes(id));
-    const rolesToRemove = currentRoleIds.filter(id => !newRoleIds.includes(id));
+    let rolesToRemove = currentRoleIds.filter(id => !newRoleIds.includes(id));
+
+    if (user && isProtectedAdminEmail(user.email)) {
+      const sysAdminRoleIds = this.adminStore.roles()
+        .filter((r) => isSysAdminRole(r.name))
+        .map((r) => String(r.id));
+      rolesToRemove = rolesToRemove.filter((id) => !sysAdminRoleIds.includes(id));
+    }
 
     try {
       for (const roleId of rolesToAdd) {
@@ -506,6 +543,30 @@ export class UsersComponent implements OnInit {
   protected onModalClose(): void {
     this.userForm.reset();
     this.isCreateOpen.set(false);
+  }
+
+  protected openDeleteDialog(user: UsersTable): void {
+    this.deleteTarget.set(user);
+    this.isDeleteOpen.set(true);
+  }
+
+  protected closeDeleteDialog(): void {
+    this.isDeleteOpen.set(false);
+    this.deleteTarget.set(null);
+    this.isDeleting.set(false);
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const target = this.deleteTarget();
+    if (!target) return;
+
+    this.isDeleting.set(true);
+    const ok = await this.usersStore.deleteUser(target.id);
+    this.isDeleting.set(false);
+    if (ok) {
+      this.closeDeleteDialog();
+      await this.adminStore.loadRealData();
+    }
   }
 
   protected async onCreateSubmit(): Promise<void> {

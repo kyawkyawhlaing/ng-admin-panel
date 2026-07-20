@@ -1,5 +1,5 @@
 import { Component, ElementRef, effect, input, output, viewChild } from '@angular/core';
-import { KkhButtonComponent } from './kkh-button';
+import { KkhButtonComponent, KkhButtonVariant } from './kkh-button';
 
 @Component({
   selector: 'kkh-dialog',
@@ -36,7 +36,7 @@ import { KkhButtonComponent } from './kkh-button';
           @if (showDefaultActions()) {
             <kkh-button variant="ghost" (pressed)="close()">{{ cancelLabel() }}</kkh-button>
             <kkh-button
-              variant="primary"
+              [variant]="confirmVariant()"
               [disabled]="confirmDisabled()"
               [loading]="confirmLoading()"
               (pressed)="confirmed.emit()"
@@ -56,6 +56,7 @@ export class KkhDialogComponent {
   readonly showDefaultActions = input(true);
   readonly cancelLabel = input('Cancel');
   readonly confirmLabel = input('Save');
+  readonly confirmVariant = input<KkhButtonVariant>('primary');
   readonly confirmDisabled = input(false);
   readonly confirmLoading = input(false);
 

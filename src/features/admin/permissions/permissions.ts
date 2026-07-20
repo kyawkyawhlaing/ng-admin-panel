@@ -20,7 +20,8 @@ import {
   KkhColumnDef
 } from '../../../shared/ui';
 import { PermissionsTable, ActionStatus } from '../../../types/database';
-import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon, Edit, Layout } from 'lucide-angular';
+import { isProtectedPermission } from '../../../core/auth/system-defaults.util';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-permissions',
@@ -45,7 +46,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
     {
       provide: LUCIDE_ICONS,
       multi: true,
-      useValue: new LucideIconProvider({ Menu: MenuIcon, Edit, Layout })
+      useValue: new LucideIconProvider({ Edit, Trash2 })
     }
   ],
   template: `
@@ -146,20 +147,22 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
             @if (canEdit()) {
             <button
               type="button"
-              (click)="openAssignDialog(row.id.toString())"
-              class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
-              title="Assign Navigation"
-            >
-              <lucide-icon name="layout" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
-            </button>
-            <button
-              type="button"
               (click)="openCreateModal(row)"
               class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
               title="Edit Permission"
             >
               <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
             </button>
+            }
+            @if (canDelete() && !isProtectedPermissionRow(row)) {
+              <button
+                type="button"
+                (click)="openDeleteDialog(row)"
+                class="text-[var(--kkh-danger)] hover:opacity-80 transition-opacity cursor-pointer"
+                title="Delete Permission"
+              >
+                <lucide-icon name="trash-2" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
+              </button>
             }
           </div>
         </ng-template>
@@ -223,6 +226,17 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu as MenuIcon
         </kkh-button>
       </div>
     </kkh-dialog>
+
+    <kkh-dialog
+      [open]="isDeleteOpen()"
+      title="Delete Permission"
+      [subtitle]="deleteTarget() ? 'Permanently remove permission ' + deleteTarget()!.name + '. Role bindings will be removed. This cannot be undone.' : null"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      [confirmLoading]="isDeleting()"
+      (closed)="closeDeleteDialog()"
+      (confirmed)="confirmDelete()"
+    />
   `
 })
 export class PermissionsComponent implements OnInit {
@@ -234,8 +248,12 @@ export class PermissionsComponent implements OnInit {
   protected readonly canView = computed(() => this.authStore.hasPermission('permissions_view'));
   protected readonly canCreate = computed(() => this.authStore.hasPermission('permissions_create'));
   protected readonly canEdit = computed(() => this.authStore.hasPermission('permissions_edit'));
+  protected readonly canDelete = computed(() => this.authStore.hasPermission('permissions_delete'));
 
   protected readonly isCreateOpen = signal(false);
+  protected readonly isDeleteOpen = signal(false);
+  protected readonly isDeleting = signal(false);
+  protected readonly deleteTarget = signal<PermissionsTable | null>(null);
 
   protected readonly columns: KkhColumnDef[] = [
     { id: 'id', header: 'ID', sortable: true },
@@ -336,6 +354,10 @@ export class PermissionsComponent implements OnInit {
     return this.adminStore.permissionMenus().filter(pm => pm.permissionId === permissionId).length;
   }
 
+  protected isProtectedPermissionRow(permission: PermissionsTable): boolean {
+    return isProtectedPermission(permission.name, permission.resource);
+  }
+
   protected openAssignDialog(permissionId: string): void {
     this.activePermissionId.set(permissionId);
     this.isDialogOpen.set(true);
@@ -420,5 +442,29 @@ export class PermissionsComponent implements OnInit {
     }
 
     this.closeCreateModal();
+  }
+
+  protected openDeleteDialog(permission: PermissionsTable): void {
+    this.deleteTarget.set(permission);
+    this.isDeleteOpen.set(true);
+  }
+
+  protected closeDeleteDialog(): void {
+    this.isDeleteOpen.set(false);
+    this.deleteTarget.set(null);
+    this.isDeleting.set(false);
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const target = this.deleteTarget();
+    if (!target) return;
+
+    this.isDeleting.set(true);
+    const ok = await this.permissionsStore.deletePermission(target.id);
+    this.isDeleting.set(false);
+    if (ok) {
+      this.closeDeleteDialog();
+      await this.adminStore.loadRealData();
+    }
   }
 }

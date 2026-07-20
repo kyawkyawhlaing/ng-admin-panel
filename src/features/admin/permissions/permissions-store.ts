@@ -134,6 +134,19 @@ export const PermissionsStore = signalStore(
           toast.error(`Failed to update permission: ${err.message || 'Unknown error'}`);
           console.error('Error editing permission:', err);
         }
+      },
+
+      async deletePermission(id: number): Promise<boolean> {
+        try {
+          await lastValueFrom(http.delete(`/permissions/${id}`));
+          toast.success('Permission deleted');
+          await loadPermissions(true);
+          return true;
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to delete permission');
+          console.error('Error deleting permission:', err);
+          return false;
+        }
       }
     };
   })

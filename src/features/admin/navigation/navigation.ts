@@ -16,7 +16,8 @@ import {
 } from '../../../shared/ui';
 import { NavigationItemTable } from '../../../types/database';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
-import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home, Settings, Users, Key, Database, Shield, Layout, FileText, Component as ComponentIcon } from 'lucide-angular';
+import { isProtectedNavigation } from '../../../core/auth/system-defaults.util';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Trash2, Home, Settings, Users, Key, Database, Shield, Layout, FileText, Component as ComponentIcon } from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-navigation',
@@ -42,6 +43,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
       useValue: new LucideIconProvider({
         Menu,
         Edit,
+        Trash2,
         Home,
         Settings,
         Users,
@@ -169,6 +171,16 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
               <lucide-icon name="edit" class="w-4.5 h-4.5" [strokeWidth]="2" />
             </button>
             }
+            @if (canDelete() && !isProtectedNavItem(row)) {
+              <button
+                type="button"
+                (click)="openDeleteDialog(row)"
+                class="text-[var(--kkh-danger)] hover:opacity-80 transition-opacity cursor-pointer"
+                title="Delete Navigation Item"
+              >
+                <lucide-icon name="trash-2" class="w-4.5 h-4.5" [strokeWidth]="2" />
+              </button>
+            }
           </div>
         </ng-template>
       </kkh-data-table>
@@ -272,6 +284,17 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home
         </kkh-button>
       </div>
     </kkh-dialog>
+
+    <kkh-dialog
+      [open]="isDeleteOpen()"
+      title="Delete Navigation Item"
+      [subtitle]="deleteTarget() ? 'Permanently remove ' + deleteTarget()!.title + '. Child items will be moved to root. This cannot be undone.' : null"
+      confirmLabel="Delete"
+      confirmVariant="danger"
+      [confirmLoading]="isDeleting()"
+      (closed)="closeDeleteDialog()"
+      (confirmed)="confirmDelete()"
+    />
   `
 })
 export class NavigationComponent implements OnInit {
@@ -281,8 +304,12 @@ export class NavigationComponent implements OnInit {
   protected readonly canView = computed(() => this.authStore.hasPermission('navigation_view'));
   protected readonly canCreate = computed(() => this.authStore.hasPermission('navigation_create'));
   protected readonly canEdit = computed(() => this.authStore.hasPermission('navigation_edit'));
+  protected readonly canDelete = computed(() => this.authStore.hasPermission('navigation_delete'));
 
   protected readonly isCreateOpen = signal(false);
+  protected readonly isDeleteOpen = signal(false);
+  protected readonly isDeleting = signal(false);
+  protected readonly deleteTarget = signal<NavigationItemTable | null>(null);
 
   protected readonly columns: KkhColumnDef[] = [
     { id: 'icon', header: 'Icon', align: 'center' },
@@ -411,5 +438,32 @@ export class NavigationComponent implements OnInit {
     }
 
     this.closeCreateModal();
+  }
+
+  protected openDeleteDialog(item: NavigationItemTable): void {
+    this.deleteTarget.set(item);
+    this.isDeleteOpen.set(true);
+  }
+
+  protected isProtectedNavItem(item: NavigationItemTable): boolean {
+    return isProtectedNavigation(item.resource, item.route);
+  }
+
+  protected closeDeleteDialog(): void {
+    this.isDeleteOpen.set(false);
+    this.deleteTarget.set(null);
+    this.isDeleting.set(false);
+  }
+
+  protected async confirmDelete(): Promise<void> {
+    const target = this.deleteTarget();
+    if (!target) return;
+
+    this.isDeleting.set(true);
+    const ok = await this.navigationStore.deleteItem(target.id);
+    this.isDeleting.set(false);
+    if (ok) {
+      this.closeDeleteDialog();
+    }
   }
 }
