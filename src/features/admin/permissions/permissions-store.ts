@@ -1,8 +1,9 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { createDebouncedTask, SEARCH_DEBOUNCE_MS } from '../../../shared/util/debounce';
 import { PermissionsTable, MenuStatusTable } from '../../../types/database';
 
 export interface PermissionsState {
@@ -31,8 +32,9 @@ const initialState: PermissionsState = {
 
 export const PermissionsStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
-    
+  withMethods((store, http = inject(HttpClient), toast = inject(ToastService)) => {
+    const debouncedSearch = createDebouncedTask(SEARCH_DEBOUNCE_MS);
+
     const loadPermissions = async (background: boolean = false) => {
       if (!background) {
         patchState(store, { isLoading: true, error: null });
@@ -48,7 +50,7 @@ export const PermissionsStore = signalStore(
         };
 
         const response = await lastValueFrom(
-          http.post<{ metadata: { totalCount: number }, items: PermissionsTable[] }>('https://localhost:5001/permissions/list', payload)
+          http.post<{ metadata: { totalCount: number }, items: PermissionsTable[] }>('/permissions/list', payload)
         );
 
         patchState(store, { 
@@ -64,11 +66,10 @@ export const PermissionsStore = signalStore(
 
     return {
       pagedPermissions: computed(() => store.permissions()),
-      totalPermissionsCount: computed(() => store.totalPermissionsCount()),
 
       async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
-        await loadPermissions(true);
+        debouncedSearch.schedule(() => loadPermissions(true));
       },
 
       async setPage(index: number, size: number) {
@@ -106,7 +107,7 @@ export const PermissionsStore = signalStore(
 
       async loadMenuStatuses() {
         try {
-          const menuStatuses = await lastValueFrom(http.get<MenuStatusTable[]>('https://localhost:5001/menus/statuses'));
+          const menuStatuses = await lastValueFrom(http.get<MenuStatusTable[]>('/menus/statuses'));
           patchState(store, { menuStatuses });
         } catch (err: any) {
           console.error('Failed to load menu statuses', err);
@@ -115,22 +116,22 @@ export const PermissionsStore = signalStore(
 
       async addPermission(permission: any) {
         try {
-          await lastValueFrom(http.post('https://localhost:5001/permissions', permission));
-          snackBar.open('Permission successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await lastValueFrom(http.post('/permissions', permission));
+          toast.success('Permission successfully created!');
           await loadPermissions(true);
         } catch (err: any) {
-          snackBar.open(`Failed to create permission: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to create permission: ${err.message || 'Unknown error'}`);
           console.error('Error adding permission:', err);
         }
       },
 
       async editPermission(id: number, permission: any) {
         try {
-          await lastValueFrom(http.put(`https://localhost:5001/permissions/${id}`, permission));
-          snackBar.open('Permission successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await lastValueFrom(http.put(`/permissions/${id}`, permission));
+          toast.success('Permission successfully updated!');
           await loadPermissions(true);
         } catch (err: any) {
-          snackBar.open(`Failed to update permission: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to update permission: ${err.message || 'Unknown error'}`);
           console.error('Error editing permission:', err);
         }
       }

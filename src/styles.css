@@ -1,114 +1,92 @@
-/* You can add global styles to this file, and also import other style files */
-
 @import 'tailwindcss';
 @custom-variant dark (&:where(.dark, .dark *));
 
-@import '@angular/material/prebuilt-themes/azure-blue.css';
+@theme {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Chakra Petch', ui-sans-serif, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-/* Override Material Form Fields to make them flat, minimalist and enterprise-ready */
-.mat-mdc-form-field {
-  --mdc-outlined-text-field-outline-color: var(--color-slate-200) !important;
-  --mdc-outlined-text-field-hover-outline-color: var(--color-slate-400) !important;
-  --mdc-outlined-text-field-focus-outline-color: var(--color-blue-600) !important;
-  --mdc-outlined-text-field-focus-outline-width: 1.5px !important;
-  --mdc-outlined-text-field-container-shape: 8px !important;
-  
-  --mat-form-field-state-error-hover-outline-color: var(--color-red-400) !important;
-  --mat-form-field-state-error-focus-outline-color: var(--color-red-500) !important;
-  --mat-form-field-state-error-outline-color: var(--color-red-300) !important;
-  
-  width: 100%;
+  --color-cyber-void: #0b1220;
+  --color-cyber-panel: #121a27;
+  --color-cyber-raised: #1a2433;
+  --color-cyber-line: #2a3648;
+  --color-cyber-muted: #8b9bb0;
+  --color-cyber-text: #e6edf7;
+  --color-cyber-cyan: #1aa7c4;
+  --color-cyber-cyan-dim: #0e7490;
+  --color-cyber-lime: #6f9f2e;
+  --color-cyber-alert: #dc3d57;
 }
 
-/* Override input font and colors to match enterprise style */
-.mat-mdc-form-field .mdc-text-field--outlined {
-  background-color: var(--color-white) !important;
+:root {
+  --kkh-radius: 2px;
+  --kkh-focus-ring: 0 0 0 2px color-mix(in srgb, var(--kkh-accent) 35%, transparent);
+  /* Corporate light */
+  --kkh-bg: #f1f4f8;
+  --kkh-panel: #ffffff;
+  --kkh-raised: #f7f9fc;
+  --kkh-border: #d5dde8;
+  --kkh-text: #152033;
+  --kkh-muted: #5c6b80;
+  --kkh-accent: #0e7490;
+  --kkh-accent-dim: #0f5f75;
+  --kkh-ok: #3f7d1a;
+  --kkh-danger: #c62845;
+  --kkh-warning: #b45309;
+  --kkh-info: #0369a1;
+  --kkh-hover: rgba(14, 116, 144, 0.07);
+  --kkh-on-accent: #ffffff;
+  color-scheme: light;
 }
 
-.mat-mdc-input-element {
-  font-family: var(--font-sans) !important;
-  color: var(--color-slate-900) !important;
-  font-size: 0.875rem !important; /* 14px */
+.dark {
+  --kkh-bg: var(--color-cyber-void);
+  --kkh-panel: var(--color-cyber-panel);
+  --kkh-raised: var(--color-cyber-raised);
+  --kkh-border: var(--color-cyber-line);
+  --kkh-text: var(--color-cyber-text);
+  --kkh-muted: var(--color-cyber-muted);
+  --kkh-accent: var(--color-cyber-cyan);
+  --kkh-accent-dim: var(--color-cyber-cyan-dim);
+  --kkh-ok: var(--color-cyber-lime);
+  --kkh-danger: var(--color-cyber-alert);
+  --kkh-warning: #d97706;
+  --kkh-info: #38bdf8;
+  --kkh-hover: rgba(26, 167, 196, 0.08);
+  --kkh-on-accent: #041016;
+  color-scheme: dark;
 }
 
-/* Material Labels */
-.mat-mdc-form-field .mdc-floating-label {
-  font-family: var(--font-sans) !important;
-  color: var(--color-slate-500) !important;
-  font-size: 0.875rem !important;
+html,
+body {
+  height: 100%;
 }
 
-.mat-mdc-form-field.mat-focused .mdc-floating-label {
-  color: var(--color-blue-600) !important;
+.cyber-body {
+  margin: 0;
+  background: var(--kkh-bg);
+  color: var(--kkh-text);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Subtext & errors */
-.mat-mdc-form-field .mat-mdc-form-field-subscript-wrapper {
-  font-size: 0.75rem !important;
-  color: var(--color-slate-500) !important;
-  padding-left: 4px !important;
-  margin-top: 4px !important;
+/* Subtle grid — shell/auth only */
+.cyber-grid {
+  background-color: var(--kkh-bg);
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--kkh-accent) 5%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--kkh-accent) 5%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
 }
 
-.mat-mdc-form-field .mat-mdc-error {
-  color: var(--color-red-600) !important;
-  font-weight: 500 !important;
+.font-display {
+  font-family: var(--font-display);
 }
 
-/* Overriding Angular Material Buttons to look flat/minimalist */
-.mat-mdc-flat-button {
-  --mdc-flat-button-container-shape: 8px !important;
-  letter-spacing: normal !important;
-  font-family: var(--font-sans) !important;
-  font-weight: 600 !important;
-  height: 44px !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-}
-
-.mat-mdc-flat-button:not(:disabled) {
-  background-color: var(--color-blue-600) !important;
-  color: var(--color-white) !important;
-  cursor: pointer !important;
-}
-
-.mat-mdc-flat-button:hover:not(:disabled) {
-  background-color: var(--color-blue-500) !important;
-  color: var(--color-white) !important;
-  box-shadow: 0 4px 6px -1px rgb(59 130 246 / 0.15), 0 2px 4px -2px rgb(59 130 246 / 0.15) !important;
-  transform: translateY(-1px) !important;
-}
-
-.mat-mdc-flat-button:active:not(:disabled) {
-  transform: translateY(0.5px) !important;
-  box-shadow: none !important;
-}
-
-.mat-mdc-flat-button:disabled,
-.mat-mdc-flat-button.mat-mdc-button-disabled {
-  background-color: var(--color-slate-100) !important;
-  color: var(--color-slate-400) !important;
-  cursor: not-allowed !important;
-  pointer-events: auto !important; /* Allows displaying the not-allowed cursor */
-  opacity: 0.65 !important;
-  border: 1px solid var(--color-slate-200) !important;
-  box-shadow: none !important;
-}
-
-.mat-mdc-flat-button.is-loading:disabled,
-.mat-mdc-flat-button.is-loading.mat-mdc-button-disabled,
-.mat-mdc-unelevated-button.is-loading:disabled,
-.mat-mdc-unelevated-button.is-loading.mat-mdc-button-disabled,
-button.is-loading:disabled,
-button.is-loading.mat-mdc-button-disabled,
-.is-loading:disabled,
-.is-loading.mat-mdc-button-disabled {
-  background-color: var(--color-blue-600) !important;
-  color: var(--color-white) !important;
-  cursor: wait !important;
-  pointer-events: auto !important;
-  opacity: 0.8 !important;
-  border: none !important;
-  box-shadow: none !important;
+.font-mono {
+  font-family: var(--font-mono);
 }
 
 button:disabled {
@@ -116,100 +94,746 @@ button:disabled {
   pointer-events: auto !important;
 }
 
-button.is-loading:disabled {
-  cursor: wait !important;
+input[type='checkbox'] {
+  accent-color: var(--kkh-accent);
 }
 
-/* Custom styles for checkbox input */
-input[type="checkbox"] {
-  accent-color: var(--color-blue-600);
-}
-
-/* Center HTML5 dialog elements globally and override Tailwind CSS margin: 0 reset */
 dialog {
   position: fixed !important;
   inset: 0 !important;
   margin: auto !important;
+  border-radius: var(--kkh-radius) !important;
 }
 
-/* Dark Mode Overrides for Angular Material Components */
-.dark {
-  color-scheme: dark;
+/* ——— Shared component hosts (Angular custom elements default to inline) ——— */
+kkh-input,
+kkh-select,
+kkh-textarea,
+kkh-combo-box,
+kkh-lookup,
+kkh-alert,
+kkh-page-header,
+kkh-data-table,
+kkh-transfer {
+  display: block;
+  width: 100%;
 }
 
-.dark .mat-mdc-form-field {
-  --mdc-outlined-text-field-outline-color: var(--color-slate-700) !important;
-  --mdc-outlined-text-field-hover-outline-color: var(--color-slate-500) !important;
-  --mdc-outlined-text-field-focus-outline-color: var(--color-blue-500) !important;
-  --mat-form-field-state-error-hover-outline-color: var(--color-red-500) !important;
-  --mat-form-field-state-error-focus-outline-color: var(--color-red-400) !important;
-  --mat-form-field-state-error-outline-color: var(--color-red-600) !important;
+kkh-button {
+  display: inline-block;
+  vertical-align: middle;
+  max-width: 100%;
 }
 
-.dark .mat-mdc-form-field .mdc-text-field--outlined {
-  background-color: var(--color-slate-800) !important;
+kkh-button.kkh-host-full {
+  display: block;
+  width: 100%;
 }
 
-.dark .mat-mdc-input-element {
-  color: var(--color-slate-100) !important;
+kkh-button.kkh-host-full .kkh-btn {
+  width: 100%;
 }
 
-.dark .mat-mdc-form-field .mdc-floating-label {
-  color: var(--color-slate-400) !important;
+.kkh-field {
+  display: block;
+  width: 100%;
 }
 
-.dark .mat-mdc-form-field.mat-focused .mdc-floating-label {
-  color: var(--color-blue-500) !important;
+/* ——— Surfaces ——— */
+.kkh-panel {
+  position: relative;
+  background: var(--kkh-panel);
+  border: 1px solid var(--kkh-border);
+  border-radius: var(--kkh-radius);
 }
 
-.dark .mat-mdc-form-field .mat-mdc-form-field-subscript-wrapper {
-  color: var(--color-slate-400) !important;
+.kkh-panel--framed::before,
+.kkh-panel--framed::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  pointer-events: none;
+  border-color: var(--kkh-accent);
+  opacity: 0.45;
+  z-index: 1;
 }
 
-/* Material Table overrides for dark mode */
-.mat-mdc-table {
+.kkh-panel--framed::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+
+.kkh-panel--framed::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
+.kkh-raised {
+  background: var(--kkh-raised);
+  border: 1px solid var(--kkh-border);
+  border-radius: var(--kkh-radius);
+}
+
+.kkh-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 3px;
+  background: var(--kkh-accent);
+  border-radius: 0;
+}
+
+.kkh-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.kkh-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kkh-muted);
+}
+
+/* Form field labels — readable sans, not terminal chrome */
+.kkh-field-label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  color: var(--kkh-muted);
+}
+
+.kkh-nav-active {
+  background: var(--kkh-hover);
+  color: var(--kkh-accent);
+  border-left: 2px solid var(--kkh-accent);
+}
+
+.kkh-nav-item {
+  border-left: 2px solid transparent;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.kkh-nav-item:hover {
+  background: var(--kkh-hover);
+}
+
+/* ——— Buttons (CSS fallback; prefer kkh-button component) ——— */
+.kkh-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--kkh-border);
+  background: var(--kkh-panel);
+  color: var(--kkh-text);
+  padding: 0.5rem 1rem;
+  min-height: 40px;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border-radius: var(--kkh-radius);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kkh-btn:hover:not(:disabled) {
+  border-color: var(--kkh-accent);
+  color: var(--kkh-accent);
+}
+
+.kkh-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--kkh-focus-ring);
+}
+
+.kkh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kkh-btn-primary {
+  background: var(--kkh-accent);
+  border-color: var(--kkh-accent);
+  color: var(--kkh-on-accent);
+}
+
+.kkh-btn-primary:hover:not(:disabled) {
+  background: var(--kkh-accent-dim);
+  border-color: var(--kkh-accent-dim);
+  color: var(--kkh-on-accent);
+}
+
+.kkh-btn-ghost {
+  background: transparent;
+  color: var(--kkh-text);
+}
+
+.kkh-btn-danger {
+  background: var(--kkh-danger);
+  border-color: var(--kkh-danger);
+  color: #fff;
+}
+
+.kkh-btn-danger:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: #fff;
+}
+
+.kkh-btn-loading {
+  font-family: var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.8125rem;
+}
+
+/* ——— Cyber auth / session loading ——— */
+.kkh-spinner-cyber {
+  position: relative;
+  display: inline-block;
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
+}
+
+.kkh-spinner-cyber::before,
+.kkh-spinner-cyber::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 1px;
+  border: 1.5px solid transparent;
+}
+
+.kkh-spinner-cyber::before {
+  border-top-color: currentColor;
+  border-right-color: currentColor;
+  animation: kkh-cyber-spin 0.7s linear infinite;
+}
+
+.kkh-spinner-cyber::after {
+  inset: 2px;
+  border-bottom-color: color-mix(in srgb, currentColor 45%, transparent);
+  border-left-color: color-mix(in srgb, currentColor 45%, transparent);
+  animation: kkh-cyber-spin 1.1s linear infinite reverse;
+}
+
+@keyframes kkh-cyber-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.kkh-auth-status {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--kkh-accent) 35%, var(--kkh-border));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--kkh-accent) 12%, transparent),
+      transparent 55%
+    ),
+    var(--kkh-raised);
+  border-radius: var(--kkh-radius);
+  overflow: hidden;
+  position: relative;
+}
+
+.kkh-auth-status::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kkh-accent) 8%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+  animation: kkh-auth-scan 1.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes kkh-auth-scan {
+  0% {
+    background-position: 0 -100%;
+  }
+  100% {
+    background-position: 0 200%;
+  }
+}
+
+.kkh-auth-status__code {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--kkh-accent);
   white-space: nowrap;
 }
 
-th.mat-mdc-header-cell {
+.kkh-auth-status__msg {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.04em;
+  color: var(--kkh-muted);
+}
+
+.kkh-auth-status--danger {
+  border-color: color-mix(in srgb, var(--kkh-danger) 40%, var(--kkh-border));
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--kkh-danger) 12%, transparent),
+      transparent 55%
+    ),
+    var(--kkh-raised);
+}
+
+.kkh-auth-status--danger .kkh-auth-status__code {
+  color: var(--kkh-danger);
+}
+
+.kkh-auth-status--danger::after {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kkh-danger) 10%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+}
+
+.kkh-session-dialog {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  max-width: 26rem;
+  border: 1px solid var(--kkh-border);
+  background: var(--kkh-panel);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--kkh-bg) 55%, transparent);
+}
+
+.kkh-session-dialog__corners::before,
+.kkh-session-dialog__corners::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--kkh-danger);
+  border-style: solid;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.kkh-session-dialog__corners::before {
+  top: 6px;
+  left: 6px;
+  border-width: 1.5px 0 0 1.5px;
+}
+
+.kkh-session-dialog__corners::after {
+  top: 6px;
+  right: 6px;
+  border-width: 1.5px 1.5px 0 0;
+}
+
+.kkh-session-dialog__corners-b::before,
+.kkh-session-dialog__corners-b::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--kkh-danger);
+  border-style: solid;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.kkh-session-dialog__corners-b::before {
+  bottom: 6px;
+  left: 6px;
+  border-width: 0 0 1.5px 1.5px;
+}
+
+.kkh-session-dialog__corners-b::after {
+  bottom: 6px;
+  right: 6px;
+  border-width: 0 1.5px 1.5px 0;
+}
+
+/* ——— Chips ——— */
+.kkh-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--kkh-border);
+  background: var(--kkh-raised);
+  color: var(--kkh-muted);
+  border-radius: var(--kkh-radius);
+  border-left: 2px solid var(--kkh-muted);
+  user-select: none;
   white-space: nowrap;
 }
 
-td.mat-mdc-cell {
+.kkh-chip-ok {
+  border-left-color: var(--kkh-ok);
+  color: var(--kkh-ok);
+  background: color-mix(in srgb, var(--kkh-ok) 8%, transparent);
+}
+
+.kkh-chip-danger {
+  border-left-color: var(--kkh-danger);
+  color: var(--kkh-danger);
+  background: color-mix(in srgb, var(--kkh-danger) 8%, transparent);
+}
+
+.kkh-chip-accent {
+  border-left-color: var(--kkh-accent);
+  color: var(--kkh-accent);
+  background: color-mix(in srgb, var(--kkh-accent) 8%, transparent);
+}
+
+.kkh-chip-muted {
+  border-left-color: var(--kkh-muted);
+  color: var(--kkh-muted);
+}
+
+.kkh-chip-warning {
+  border-left-color: var(--kkh-warning);
+  color: var(--kkh-warning);
+  background: color-mix(in srgb, var(--kkh-warning) 8%, transparent);
+}
+
+/* Compact relation counts in tables (roles↔permissions, etc.) */
+.kkh-relation-summary {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kkh-relation-summary:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.kkh-relation-summary__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 1.625rem;
+  padding: 0.2rem 0.6rem;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--kkh-text);
+  border: 1px solid var(--kkh-border);
+  border-radius: var(--kkh-radius);
+  background: var(--kkh-raised);
   white-space: nowrap;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.dark .mat-mdc-table {
-  background-color: var(--color-slate-800) !important;
-  color: var(--color-slate-200) !important;
+.kkh-relation-summary__label {
+  display: inline-block;
 }
 
-.dark th.mat-mdc-header-cell {
-  background-color: var(--color-slate-900) !important;
-  color: var(--color-slate-300) !important;
-  border-bottom: 1px solid var(--color-slate-700) !important;
+.kkh-relation-summary__icon {
+  display: inline-flex;
+  width: 0;
+  overflow: hidden;
+  opacity: 0;
+  color: var(--kkh-accent);
+  transition: width 0.15s ease, opacity 0.15s ease, margin 0.15s ease;
 }
 
-.dark td.mat-mdc-cell {
-  border-bottom: 1px solid var(--color-slate-700) !important;
-  color: var(--color-slate-300) !important;
+.kkh-relation-summary__icon svg {
+  width: 0.875rem;
+  height: 0.875rem;
+  flex-shrink: 0;
 }
 
-.dark tr.mat-mdc-header-row {
-  background-color: var(--color-slate-900) !important;
+.kkh-relation-summary:not(:disabled):hover .kkh-relation-summary__count,
+.kkh-relation-summary:not(:disabled):focus-visible .kkh-relation-summary__count {
+  border-color: color-mix(in srgb, var(--kkh-accent) 55%, var(--kkh-border));
+  color: var(--kkh-accent);
+  background: color-mix(in srgb, var(--kkh-accent) 10%, var(--kkh-raised));
 }
 
-.dark tr.mat-mdc-row:hover {
-  background-color: var(--color-slate-700) !important;
+.kkh-relation-summary:not(:disabled):hover .kkh-relation-summary__icon,
+.kkh-relation-summary:not(:disabled):focus-visible .kkh-relation-summary__icon {
+  width: 0.875rem;
+  opacity: 1;
 }
 
-.dark .mat-mdc-flat-button:disabled,
-.dark .mat-mdc-flat-button.mat-mdc-button-disabled {
-  background-color: var(--color-slate-800) !important;
-  color: var(--color-slate-500) !important;
-  border: 1px solid var(--color-slate-700) !important;
+.kkh-relation-summary:focus-visible {
+  outline: none;
 }
 
-.dark input[type="checkbox"] {
-  accent-color: var(--color-blue-500);
+.kkh-relation-summary:focus-visible .kkh-relation-summary__count {
+  box-shadow: var(--kkh-focus-ring);
+}
+
+.kkh-relation-summary--empty .kkh-relation-summary__count {
+  color: var(--kkh-muted);
+  font-weight: 500;
+}
+
+.kkh-relation-summary--empty:not(:disabled):hover .kkh-relation-summary__count,
+.kkh-relation-summary--empty:not(:disabled):focus-visible .kkh-relation-summary__count {
+  color: var(--kkh-accent);
+}
+
+/* ——— Fields / dialogs ——— */
+.kkh-dialog {
+  position: fixed !important;
+  inset: 0 !important;
+  margin: auto !important;
+  max-width: 28rem;
+  width: calc(100% - 2rem);
+  max-height: min(90vh, 52rem);
+  padding: 0;
+  border: 1px solid var(--kkh-border) !important;
+  background: var(--kkh-panel) !important;
+  color: var(--kkh-text);
+  border-radius: var(--kkh-radius) !important;
+  box-shadow: 0 20px 56px rgba(15, 23, 42, 0.22) !important;
+  overflow: visible;
+}
+
+/* Only show when open — do not override UA display:none on closed <dialog> */
+.kkh-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.kkh-dialog::backdrop {
+  background: color-mix(in srgb, #0b1220 42%, transparent);
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+}
+
+.kkh-dialog--wide {
+  max-width: 40rem;
+}
+
+.kkh-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--kkh-border);
+  background: var(--kkh-panel);
+}
+
+.kkh-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 1.25rem 1.5rem 1.5rem;
+}
+
+.kkh-dialog__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.625rem;
+  flex-shrink: 0;
+  padding: 0.875rem 1.5rem;
+  border-top: 1px solid var(--kkh-border);
+  background: var(--kkh-raised);
+}
+
+.kkh-dialog__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.kkh-dialog__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1rem 1.125rem;
+  background: var(--kkh-raised);
+  border: 1px solid var(--kkh-border);
+  border-radius: var(--kkh-radius);
+}
+
+.kkh-input-shell {
+  position: relative;
+  width: 100%;
+}
+
+.kkh-input-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--kkh-muted);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.kkh-input-shell:focus-within .kkh-input-icon {
+  color: var(--kkh-accent);
+}
+
+.kkh-input-toggle {
+  position: absolute;
+  right: 0.375rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 0;
+  border-radius: calc(var(--kkh-radius) - 2px);
+  background: transparent;
+  color: var(--kkh-muted);
+  cursor: pointer;
+  z-index: 1;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.kkh-input-toggle:hover:not(:disabled) {
+  color: var(--kkh-text);
+  background: color-mix(in srgb, var(--kkh-border) 55%, transparent);
+}
+
+.kkh-input-toggle:focus-visible {
+  outline: none;
+  color: var(--kkh-accent);
+  box-shadow: var(--kkh-focus-ring);
+}
+
+.kkh-input-toggle:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.kkh-input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--kkh-border);
+  background: var(--kkh-raised);
+  color: var(--kkh-text);
+  padding: 0.625rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  border-radius: var(--kkh-radius);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kkh-input--with-icon {
+  padding-left: 2.375rem;
+}
+
+.kkh-input--with-toggle {
+  padding-right: 2.5rem;
+}
+
+.kkh-input:focus {
+  border-color: var(--kkh-accent);
+  box-shadow: var(--kkh-focus-ring);
+}
+
+.kkh-input::placeholder {
+  color: var(--kkh-muted);
+}
+
+.kkh-tab {
+  border-bottom: 2px solid transparent;
+  padding: 0.875rem 0.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--kkh-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.kkh-tab:hover {
+  color: var(--kkh-text);
+}
+
+.kkh-tab-active {
+  color: var(--kkh-accent);
+  border-bottom-color: var(--kkh-accent);
+}
+
+.kkh-page-enter {
+  animation: kkh-fade-up 0.28s ease both;
+}
+
+@keyframes kkh-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kkh-page-enter {
+    animation: none !important;
+  }
+}
+
+.shadow-xs,
+.shadow-sm,
+.shadow,
+.shadow-md,
+.shadow-lg,
+.shadow-xl {
+  box-shadow: none !important;
 }

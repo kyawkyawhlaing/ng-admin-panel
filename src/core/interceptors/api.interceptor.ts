@@ -2,52 +2,49 @@ import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { MatSnackBar } from '@angular/material/snack-bar';
+import { ToastService } from '../../shared/ui/toast.service';
 
 export const apiInterceptor: HttpInterceptorFn = (req, next) => {
-  const snackBar = inject(MatSnackBar);
+  const toast = inject(ToastService);
 
-  // Prepend API URL if the request starts with /api
   let apiReq = req;
-  if (req.url.startsWith('/api')) {
-    // If environment.apiUrl already ends with /api, we should replace the '/api' prefix from the URL
-    // Actually, req.url is like /api/users. If environment.apiUrl is https://localhost:5001/api,
-    // we want https://localhost:5001/api/users.
-    const urlPath = req.url.substring(4); // remove the '/api' prefix
+  if (req.url.startsWith('/')) {
     apiReq = req.clone({
-      url: `${environment.apiUrl}${urlPath}`
+      url: `${environment.apiUrl}${req.url}`
     });
   }
 
   return next(apiReq).pipe(
     catchError((error: HttpErrorResponse) => {
       let errorMsg = 'An unknown error occurred!';
-      
+
       if (error.error instanceof ErrorEvent) {
-        // Client-side error
         errorMsg = `Error: ${error.error.message}`;
+      } else if (error.status === 401) {
+        // Auth/session failures are handled by AuthStore / calling screens.
+        errorMsg = '';
+      } else if (error.status === 403) {
+        errorMsg = 'You do not have permission to perform this action.';
+      } else if (
+        req.url.includes('/users/login') ||
+        req.url.includes('/users/logout') ||
+        req.url.includes('/refresh-token')
+      ) {
+        errorMsg = '';
+      } else if (error.error?.detail) {
+        errorMsg = error.error.detail;
+      } else if (error.error?.title) {
+        errorMsg = error.error.title;
+      } else if (error.error?.message) {
+        errorMsg = error.error.message;
+      } else if (error.status === 0) {
+        errorMsg = 'Cannot connect to the server. Please check your network connection.';
       } else {
-        // Server-side error
-        if (error.status === 401) {
-          // Handled by auth interceptor, we might not want to show a global snackbar here
-          // as it redirects to login.
-          errorMsg = ''; 
-        } else if (error.error && error.error.message) {
-          errorMsg = error.error.message;
-        } else if (error.status === 0) {
-          errorMsg = 'Cannot connect to the server. Please check your network connection.';
-        } else {
-          errorMsg = `Error Code: ${error.status}\nMessage: ${error.message}`;
-        }
+        errorMsg = `Error Code: ${error.status}\nMessage: ${error.message}`;
       }
 
       if (errorMsg) {
-        snackBar.open(errorMsg, 'Close', {
-          duration: 5000,
-          horizontalPosition: 'right',
-          verticalPosition: 'bottom',
-          panelClass: ['error-snackbar']
-        });
+        toast.error(errorMsg);
       }
 
       return throwError(() => error);

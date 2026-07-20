@@ -1,41 +1,114 @@
-import { Component } from '@angular/core';
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { DatePipe } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
+import { lastValueFrom } from 'rxjs';
+import { RouterLink } from '@angular/router';
+import { KkhPageHeaderComponent } from '../../../shared/ui';
+
+interface ListMeta {
+  metadata: { totalCount: number };
+  items: unknown[];
+}
 
 @Component({
   selector: 'app-admin-dashboard',
+  imports: [RouterLink, DatePipe, KkhPageHeaderComponent],
   template: `
-    <div class="space-y-6">
-      <div>
-        <h1 class="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Dashboard</h1>
-        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">Welcome to your enterprise administration panel.</p>
+    <div class="space-y-8 kkh-page-enter">
+      <kkh-page-header
+        eyebrow="Overview"
+        title="Dashboard"
+        description="Live IAM console metrics from KKH modules."
+      />
+
+      <div class="kkh-raised px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
+        <div class="flex items-center gap-2">
+          <span class="kkh-label">Link</span>
+          <span class="kkh-chip" [class.kkh-chip-ok]="linkStatus() === 'online'" [class.kkh-chip-danger]="linkStatus() === 'degraded'" [class.kkh-chip-muted]="linkStatus() === 'checking'">
+            {{ linkStatus() }}
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="kkh-label">Last sync</span>
+          <span class="font-mono text-xs text-[var(--kkh-text)]">
+            @if (lastSync()) {
+              {{ lastSync() | date:'yyyy-MM-dd HH:mm:ss' }}
+            } @else {
+              —
+            }
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="kkh-label">Latency</span>
+          <span class="font-mono text-xs text-[var(--kkh-accent)]">
+            @if (latencyMs() !== null) {
+              {{ latencyMs() }} ms
+            } @else {
+              —
+            }
+          </span>
+        </div>
       </div>
 
-      <!-- Overview Cards -->
-      <div class="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-        @for (stat of stats; track stat.name) {
-          <div class="relative overflow-hidden rounded-lg bg-white dark:bg-slate-800 px-4 pt-5 pb-6 border border-slate-200 dark:border-slate-700 sm:px-6 transition-all hover:border-slate-300 dark:hover:border-slate-600">
-            <dt>
-              <div class="absolute rounded-md bg-blue-50 dark:bg-blue-950/50 p-3 text-blue-600 dark:text-blue-400">
-                <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true">
-                  <path stroke-linecap="round" stroke-linejoin="round" [attr.d]="stat.icon" />
-                </svg>
-              </div>
-              <p class="ml-16 truncate text-sm font-medium text-slate-500 dark:text-slate-400">{{ stat.name }}</p>
-            </dt>
-            <dd class="ml-16 flex items-baseline">
-              <p class="text-2xl font-semibold text-slate-900 dark:text-slate-100">{{ stat.value }}</p>
-              <span class="ml-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">{{ stat.change }}</span>
-            </dd>
-          </div>
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        @for (stat of stats(); track stat.name) {
+          <a [routerLink]="stat.route" class="kkh-panel relative overflow-hidden px-5 pt-5 pb-6 block hover:border-[var(--kkh-accent)] transition-colors group">
+            <div class="absolute left-0 top-0 h-full w-0.5 bg-[var(--kkh-accent)] opacity-60 group-hover:opacity-100 transition-opacity"></div>
+            <p class="kkh-label">{{ stat.name }}</p>
+            <p class="mt-3 font-display text-3xl text-[var(--kkh-text)] tracking-wide">
+              @if (loading()) {
+                <span class="text-[var(--kkh-muted)]">—</span>
+              } @else {
+                {{ stat.value }}
+              }
+            </p>
+            <p class="mt-2 text-xs text-[var(--kkh-muted)]">{{ stat.hint }}</p>
+          </a>
         }
       </div>
     </div>
   `
 })
-export class DashboardComponent {
-  protected readonly stats = [
-    { name: 'Total Users', value: '12,480', change: '+12%', icon: 'M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.109A11.386 11.386 0 0 1 10.089 20.5c-2.057 0-3.978-.549-5.636-1.512V19.13c0-2.44 1.877-4.49 4.309-4.81M15 9.128a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.128a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z' },
-    { name: 'Active Roles', value: '8', change: '0%', icon: 'M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.751A11.959 11.959 0 0 1 12 2.712Z' },
-    { name: 'Permissions Configured', value: '142', change: '+8 new', icon: 'M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-.999.43-1.563A6 6 0 1 1 21.75 8.25Z' },
-    { name: 'Menu Items', value: '24', change: '+1', icon: 'M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5' }
-  ];
+export class DashboardComponent implements OnInit {
+  private readonly http = inject(HttpClient);
+
+  protected readonly loading = signal(true);
+  protected readonly lastSync = signal<Date | null>(null);
+  protected readonly latencyMs = signal<number | null>(null);
+  protected readonly linkStatus = signal<'checking' | 'online' | 'degraded'>('checking');
+  protected readonly stats = signal([
+    { name: 'Users', value: '0', hint: 'Identity module', route: '/admin/users' },
+    { name: 'Roles', value: '0', hint: 'RBAC roles', route: '/admin/roles' },
+    { name: 'Permissions', value: '0', hint: 'Policy grants', route: '/admin/permissions' },
+    { name: 'Menus', value: '0', hint: 'Nav resources', route: '/admin/menus' }
+  ]);
+
+  async ngOnInit(): Promise<void> {
+    const emptyPayload = { pageNumber: 1, pageSize: 1 };
+    const started = performance.now();
+    try {
+      const [users, roles, permissions, menus] = await Promise.all([
+        lastValueFrom(this.http.post<ListMeta>('/users/list', emptyPayload)),
+        lastValueFrom(this.http.post<ListMeta>('/roles/list', emptyPayload)),
+        lastValueFrom(this.http.post<ListMeta>('/permissions/list', emptyPayload)),
+        lastValueFrom(this.http.post<ListMeta>('/menus/list', emptyPayload))
+      ]);
+
+      this.stats.set([
+        { name: 'Users', value: String(users.metadata.totalCount), hint: 'Identity module', route: '/admin/users' },
+        { name: 'Roles', value: String(roles.metadata.totalCount), hint: 'RBAC roles', route: '/admin/roles' },
+        { name: 'Permissions', value: String(permissions.metadata.totalCount), hint: 'Policy grants', route: '/admin/permissions' },
+        { name: 'Menus', value: String(menus.metadata.totalCount), hint: 'Nav resources', route: '/admin/menus' }
+      ]);
+      this.linkStatus.set('online');
+      this.latencyMs.set(Math.round(performance.now() - started));
+      this.lastSync.set(new Date());
+    } catch {
+      this.linkStatus.set('degraded');
+      this.latencyMs.set(Math.round(performance.now() - started));
+      this.lastSync.set(new Date());
+    } finally {
+      this.loading.set(false);
+    }
+  }
 }

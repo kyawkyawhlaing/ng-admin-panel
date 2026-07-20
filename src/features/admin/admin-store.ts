@@ -67,57 +67,69 @@ export const AdminStore = signalStore(
   withState(initialAdminState),
   withCallState(),
   withMethods((store, http = inject(HttpClient)) => {
-    // Helper to simulate network latency
-    const simulateApiCall = <T>(action: () => T, delay = 800): Promise<T> => {
-      patchState(store, setLoading());
-      return new Promise<T>((resolve, reject) => {
-        setTimeout(() => {
-          try {
-            const result = action();
-            patchState(store, setLoaded());
-            resolve(result);
-          } catch (err) {
-            const errorMsg = err instanceof Error ? err.message : 'Unknown error occurred';
-            patchState(store, setError(errorMsg));
-            reject(err);
-          }
-        }, delay);
-      });
+    const fetchAllPages = async (endpoint: string): Promise<any[]> => {
+      const pageSize = 50;
+      let pageNumber = 1;
+      const items: any[] = [];
+      while (true) {
+        const response = await lastValueFrom(
+          http.post<{ items: any[]; metadata?: { totalCount?: number } }>(endpoint, {
+            searchTerm: null,
+            sorts: [],
+            pageNumber,
+            pageSize
+          })
+        );
+        items.push(...(response.items ?? []));
+        const total = response.metadata?.totalCount ?? items.length;
+        if (items.length >= total || (response.items?.length ?? 0) < pageSize) {
+          break;
+        }
+        pageNumber += 1;
+      }
+      return items;
     };
 
     return {
       // Backend Synced Loaders
       async loadRealData(): Promise<void> {
         try {
-          // Fetch all roles without pagination for assignment dropdowns
-          const payload = { searchTerm: null, sorts: [], pageNumber: 1, pageSize: 1000 };
-          const response = await lastValueFrom(
-            http.post<{ items: any[] }>('https://localhost:5001/roles/list', payload)
-          );
-          const backendRoles = response.items.map(r => ({
+          const roles = await fetchAllPages('/roles/list');
+          const backendRoles = roles.map(r => ({
             id: r.id.toString(),
             name: r.name,
             description: `Normalized: ${r.normalized_name}`
           }));
 
-          // Fetch all permissions without pagination for assignment dropdowns
-          const permResponse = await lastValueFrom(
-            http.post<{ items: any[] }>('https://localhost:5001/permissions/list', payload)
-          );
-          const backendPermissions = permResponse.items.map(p => ({
+          const permissions = await fetchAllPages('/permissions/list');
+          const backendPermissions = permissions.map(p => ({
             id: p.id.toString(),
             name: p.name,
             description: p.description || '',
-            code: `${p.resource}_${p.action}`
+            code: `${p.resource}_${p.action}`,
+            resource: p.resource as string,
+            action: p.action as string
           }));
 
-          const mappings = await lastValueFrom(http.get<{userId: string, roleId: number}[]>('https://localhost:5001/users/roles-mapping'));
+          const mappings = await lastValueFrom(http.get<{userId: string, roleId: number}[]>('/users/roles-mapping'));
           const formatted = mappings.map(m => ({ userId: m.userId, roleId: m.roleId.toString() }));
 
-          const rolePermMappings = await lastValueFrom(http.get<{roleId: number, permissionId: number}[]>('https://localhost:5001/roles/permissions-mapping'));
+          const rolePermMappings = await lastValueFrom(http.get<{roleId: number, permissionId: number}[]>('/roles/permissions-mapping'));
           const formattedRolePerms = rolePermMappings.map(m => ({ roleId: m.roleId.toString(), permissionId: m.permissionId.toString() }));
 
-          patchState(store, { roles: backendRoles, permissions: backendPermissions, userRoles: formatted, rolePermissions: formattedRolePerms });
+          const permMenuMappings = await lastValueFrom(http.get<{permissionId: number, menuId: number}[]>('/permissions/menus-mapping'));
+          const formattedPermMenus = permMenuMappings.map(m => ({
+            permissionId: m.permissionId.toString(),
+            menuId: m.menuId.toString()
+          }));
+
+          patchState(store, {
+            roles: backendRoles,
+            permissions: backendPermissions,
+            userRoles: formatted,
+            rolePermissions: formattedRolePerms,
+            permissionMenus: formattedPermMenus
+          });
         } catch (err) {
           console.error("Error loading real data for admin store", err);
         }
@@ -128,7 +140,7 @@ export const AdminStore = signalStore(
         patchState(store, setLoading());
         try {
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
-          await lastValueFrom(http.post('https://localhost:5001/users/assign-roles', { userId, roleId: numRoleId }));
+          await lastValueFrom(http.post('/users/assign-roles', { userId, roleId: numRoleId }));
           const updated = [...store.userRoles(), { userId, roleId: roleId.toString() }];
           patchState(store, { userRoles: updated });
           patchState(store, setLoaded());
@@ -141,7 +153,7 @@ export const AdminStore = signalStore(
         patchState(store, setLoading());
         try {
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
-          await lastValueFrom(http.post('https://localhost:5001/users/remove-roles', { userId, roleId: numRoleId }));
+          await lastValueFrom(http.post('/users/remove-roles', { userId, roleId: numRoleId }));
           const updated = store.userRoles().filter(m => !(m.userId === userId && m.roleId === roleId.toString()));
           patchState(store, { userRoles: updated });
           patchState(store, setLoaded());
@@ -156,7 +168,7 @@ export const AdminStore = signalStore(
         try {
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
           const numPermissionId = typeof permissionId === 'string' ? parseInt(permissionId, 10) : permissionId;
-          await lastValueFrom(http.post('https://localhost:5001/roles/assign-permission', { roleId: numRoleId, permissionId: numPermissionId }));
+          await lastValueFrom(http.post('/roles/assign-permission', { roleId: numRoleId, permissionId: numPermissionId }));
           const updated = [...store.rolePermissions(), { roleId: roleId.toString(), permissionId: permissionId.toString() }];
           patchState(store, { rolePermissions: updated });
           patchState(store, setLoaded());
@@ -170,7 +182,7 @@ export const AdminStore = signalStore(
         try {
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
           const numPermissionId = typeof permissionId === 'string' ? parseInt(permissionId, 10) : permissionId;
-          await lastValueFrom(http.post('https://localhost:5001/roles/remove-permission', { roleId: numRoleId, permissionId: numPermissionId }));
+          await lastValueFrom(http.post('/roles/remove-permission', { roleId: numRoleId, permissionId: numPermissionId }));
           const updated = store.rolePermissions().filter(m => !(m.roleId === roleId.toString() && m.permissionId === permissionId.toString()));
           patchState(store, { rolePermissions: updated });
           patchState(store, setLoaded());
@@ -180,22 +192,42 @@ export const AdminStore = signalStore(
       },
 
       // Permissions to Menus Mappings CRUD
-      assignMenuToPermission(permissionId: string, menuId: string): Promise<void> {
-        return simulateApiCall(() => {
-          const exists = store.permissionMenus().some(m => m.permissionId === permissionId && m.menuId === menuId);
-          if (exists) {
-            throw new Error(`Menu is already assigned to this permission.`);
-          }
+      async assignMenuToPermission(permissionId: string, menuId: string): Promise<void> {
+        patchState(store, setLoading());
+        try {
+          const numPermissionId = parseInt(permissionId, 10);
+          const numMenuId = parseInt(menuId, 10);
+          await lastValueFrom(http.post('/permissions/assign-menus', {
+            permissionId: numPermissionId,
+            menuId: numMenuId
+          }));
           const updated = [...store.permissionMenus(), { permissionId, menuId }];
           patchState(store, { permissionMenus: updated });
-        });
+          patchState(store, setLoaded());
+        } catch (err: any) {
+          patchState(store, setError(err.message));
+          throw err;
+        }
       },
 
-      removeMenuFromPermission(permissionId: string, menuId: string): Promise<void> {
-        return simulateApiCall(() => {
-          const updated = store.permissionMenus().filter(m => !(m.permissionId === permissionId && m.menuId === menuId));
+      async removeMenuFromPermission(permissionId: string, menuId: string): Promise<void> {
+        patchState(store, setLoading());
+        try {
+          const numPermissionId = parseInt(permissionId, 10);
+          const numMenuId = parseInt(menuId, 10);
+          await lastValueFrom(http.post('/permissions/remove-menus', {
+            permissionId: numPermissionId,
+            menuId: numMenuId
+          }));
+          const updated = store.permissionMenus().filter(
+            m => !(m.permissionId === permissionId && m.menuId === menuId)
+          );
           patchState(store, { permissionMenus: updated });
-        });
+          patchState(store, setLoaded());
+        } catch (err: any) {
+          patchState(store, setError(err.message));
+          throw err;
+        }
       },
 
       // Entity queries (convenient accessor methods)

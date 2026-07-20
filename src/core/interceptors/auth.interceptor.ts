@@ -1,84 +1,111 @@
-import { HttpInterceptorFn, HttpHandlerFn, HttpRequest, HttpErrorResponse, HttpClient } from '@angular/common/http';
-import { inject, Injector } from '@angular/core';
-import { catchError, switchMap, throwError, BehaviorSubject, filter, take } from 'rxjs';
+import {
+  HttpInterceptorFn,
+  HttpHandlerFn,
+  HttpRequest,
+  HttpErrorResponse
+} from '@angular/common/http';
+import { inject } from '@angular/core';
+import {
+  catchError,
+  switchMap,
+  throwError,
+  from,
+  BehaviorSubject,
+  filter,
+  take,
+  finalize
+} from 'rxjs';
 import { AuthStore, AuthStoreType } from '../stores/auth-store';
 import { Router } from '@angular/router';
 
+const AUTH_SKIP_BEARER = ['/users/login', '/users/register', '/users/logout', '/refresh-token'];
+
 let isRefreshing = false;
-let refreshTokenSubject = new BehaviorSubject<string | null>(null);
+/** Emits new access token on success, or '' on failure so waiters unblock. */
+const refreshGate$ = new BehaviorSubject<string | null>(null);
+
+function isAuthBootstrapUrl(url: string): boolean {
+  return AUTH_SKIP_BEARER.some((path) => url.includes(path));
+}
 
 export const authInterceptor: HttpInterceptorFn = (req: HttpRequest<unknown>, next: HttpHandlerFn) => {
   const authStore = inject(AuthStore) as unknown as AuthStoreType;
   const router = inject(Router);
-  const injector = inject(Injector);
   const token = authStore.token();
 
-  let authReq = req.clone({
-    withCredentials: true
-  });
+  let authReq = req.clone({ withCredentials: true });
 
-  if (token && !req.url.includes('/login') && !req.url.includes('/refresh-token')) {
+  if (token && !isAuthBootstrapUrl(req.url)) {
     authReq = authReq.clone({
-      headers: authReq.headers.set('Authorization', `Bearer ${token}`)
+      headers: req.headers.set('Authorization', `Bearer ${token}`)
     });
   }
 
   return next(authReq).pipe(
-    catchError((error: any) => {
+    catchError((error: unknown) => {
       if (
-        error instanceof HttpErrorResponse &&
-        error.status === 401 &&
-        !req.url.includes('users/login') &&
-        !req.url.includes('refresh-token')
+        !(error instanceof HttpErrorResponse) ||
+        error.status !== 401 ||
+        isAuthBootstrapUrl(req.url)
       ) {
-        return handle401Error(authReq, next, authStore, router, injector);
+        return throwError(() => error);
       }
-      return throwError(() => error);
+
+      return handle401(authReq, next, authStore, router);
     })
   );
 };
 
-const handle401Error = (request: HttpRequest<any>, next: HttpHandlerFn, authStore: AuthStoreType, router: Router, injector: Injector) => {
+function handle401(
+  request: HttpRequest<unknown>,
+  next: HttpHandlerFn,
+  authStore: AuthStoreType,
+  router: Router
+) {
   if (!isRefreshing) {
     isRefreshing = true;
-    refreshTokenSubject.next(null);
+    refreshGate$.next(null);
 
-    const http = injector.get(HttpClient);
-    const userId = authStore.user()?.id;
-
-    if (userId) {
-      return http.post<{ accessToken: string }>('https://localhost:5001/refresh-token', { userId }, { withCredentials: true }).pipe(
-        switchMap((tokenResponse) => {
-          isRefreshing = false;
-          authStore.updateToken(tokenResponse.accessToken);
-          refreshTokenSubject.next(tokenResponse.accessToken);
-
-          return next(request.clone({
-            headers: request.headers.set('Authorization', `Bearer ${tokenResponse.accessToken}`)
+    return from(authStore.refreshSession()).pipe(
+      switchMap((newToken) => {
+        if (!newToken) {
+          refreshGate$.next('');
+          void router.navigateByUrl('/login');
+          return throwError(() => new HttpErrorResponse({
+            status: 401,
+            statusText: 'Session expired',
+            url: request.url
           }));
-        }),
-        catchError((err) => {
-          isRefreshing = false;
-          authStore.clearAuth();
-          router.navigate(['/login']);
-          return throwError(() => err);
-        })
-      );
-    } else {
-      isRefreshing = false;
-      authStore.clearAuth();
-      router.navigate(['/login']);
-      // Return a throwError instead of falling through to avoid "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value."
-      return throwError(() => new Error('User ID not found for refresh token'));
-    }
+        }
+
+        refreshGate$.next(newToken);
+        return next(request.clone({
+          setHeaders: { Authorization: `Bearer ${newToken}` },
+          withCredentials: true
+        }));
+      }),
+      finalize(() => {
+        isRefreshing = false;
+      })
+    );
   }
 
-  return refreshTokenSubject.pipe(
-    filter(token => token !== null),
+  return refreshGate$.pipe(
+    filter((token): token is string => token !== null),
     take(1),
-    switchMap((token) => next(request.clone({
-      headers: request.headers.set('Authorization', `Bearer ${token}`)
-    })))
-  );
-};
+    switchMap((token) => {
+      if (!token) {
+        return throwError(() => new HttpErrorResponse({
+          status: 401,
+          statusText: 'Session expired',
+          url: request.url
+        }));
+      }
 
+      return next(request.clone({
+        setHeaders: { Authorization: `Bearer ${token}` },
+        withCredentials: true
+      }));
+    })
+  );
+}

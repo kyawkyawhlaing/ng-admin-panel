@@ -32,7 +32,7 @@ export const ProfileStore = signalStore(
       async loadProfile(id: string) {
         patchState(store, { isLoading: true, error: null });
         try {
-          const user = await lastValueFrom(http.get<UsersTable>(`https://localhost:5001/users/${id}`));
+          const user = await lastValueFrom(http.get<UsersTable>(`/users/${id}`));
           patchState(store, { userDetails: user, isLoading: false });
         } catch (err: any) {
           patchState(store, { error: 'Failed to load profile', isLoading: false });
@@ -42,20 +42,17 @@ export const ProfileStore = signalStore(
       async updatePersonalDetails(id: string, payload: { first_name: string, last_name: string, display_name: string, email: string }) {
         patchState(store, { isSaving: true, error: null, successMessage: null });
         try {
-          await lastValueFrom(http.put(`https://localhost:5001/users/${id}`, payload));
+          await lastValueFrom(http.put(`/users/${id}`, payload));
           
           // Fetch updated user to reflect changes accurately
-          const updatedUser = await lastValueFrom(http.get<UsersTable>(`https://localhost:5001/users/${id}`));
+          const updatedUser = await lastValueFrom(http.get<UsersTable>(`/users/${id}`));
           patchState(store, { userDetails: updatedUser, isSaving: false, successMessage: 'Personal details updated successfully!' });
           
-          // Update global AuthStore
-          const currentUser = authStore.user()!;
-          authStore.setAuth(
-            { ...currentUser, email: payload.email, name: payload.display_name },
-            authStore.token()!,
-            authStore.roles(),
-            authStore.permissions()
-          );
+          // Keep auth user profile in sync (token stays memory-only in AuthStore).
+          authStore.updateUser({
+            email: payload.email,
+            name: payload.display_name
+          });
         } catch (err: any) {
           patchState(store, { error: err.error?.message || 'Failed to update details', isSaving: false });
         }
@@ -68,7 +65,7 @@ export const ProfileStore = signalStore(
             current_password: payload.currentPassword,
             new_password: payload.newPassword
           };
-          await lastValueFrom(http.put(`https://localhost:5001/users/${id}/password`, requestPayload));
+          await lastValueFrom(http.put(`/users/${id}/password`, requestPayload));
           patchState(store, { isSaving: false, successMessage: 'Password updated successfully!' });
         } catch (err: any) {
           patchState(store, { error: err.error?.message || 'Failed to update password', isSaving: false });

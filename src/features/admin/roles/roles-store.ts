@@ -1,8 +1,9 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { createDebouncedTask, SEARCH_DEBOUNCE_MS } from '../../../shared/util/debounce';
 import { RolesTable } from '../../../types/database';
 
 export interface RolesState {
@@ -29,7 +30,9 @@ const initialState: RolesState = {
 
 export const RolesStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
+  withMethods((store, http = inject(HttpClient), toast = inject(ToastService)) => {
+    const debouncedSearch = createDebouncedTask(SEARCH_DEBOUNCE_MS);
+
     const loadRoles = async (background: boolean = false) => {
       if (!background) {
         patchState(store, { isLoading: true, error: null });
@@ -45,7 +48,7 @@ export const RolesStore = signalStore(
         };
 
         const response = await lastValueFrom(
-          http.post<{ metadata: { totalCount: number }, items: RolesTable[] }>('https://localhost:5001/roles/list', payload)
+          http.post<{ metadata: { totalCount: number }, items: RolesTable[] }>('/roles/list', payload)
         );
 
         patchState(store, { 
@@ -60,11 +63,10 @@ export const RolesStore = signalStore(
 
     return {
       pagedRoles: computed(() => store.roles()),
-      totalRolesCount: computed(() => store.totalRolesCount()),
 
       async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
-        await loadRoles(true);
+        debouncedSearch.schedule(() => loadRoles(true));
       },
 
       async setPage(index: number, size: number) {
@@ -102,22 +104,22 @@ export const RolesStore = signalStore(
 
       async addRole(role: any) {
         try {
-          await lastValueFrom(http.post('https://localhost:5001/roles', role));
-          snackBar.open('Role successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await lastValueFrom(http.post('/roles', role));
+          toast.success('Role successfully created!');
           await loadRoles(true);
         } catch (err: any) {
-          snackBar.open(`Failed to create role: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to create role: ${err.message || 'Unknown error'}`);
           console.error('Error adding role:', err);
         }
       },
 
       async editRole(id: number, role: any) {
         try {
-          await lastValueFrom(http.put(`https://localhost:5001/roles/${id}`, role));
-          snackBar.open('Role successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await lastValueFrom(http.put(`/roles/${id}`, role));
+          toast.success('Role successfully updated!');
           await loadRoles(true);
         } catch (err: any) {
-          snackBar.open(`Failed to update role: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to update role: ${err.message || 'Unknown error'}`);
           console.error('Error editing role:', err);
         }
       }

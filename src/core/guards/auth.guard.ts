@@ -1,25 +1,53 @@
+import { CanActivateFn, Router, UrlTree } from '@angular/router';
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
-import { AuthStore, AuthStoreType } from '../stores/auth-store';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { filter, map, take } from 'rxjs';
+import { AuthStore, AuthStoreType, SessionStatus } from '../stores/auth-store';
+
+function waitForSessionReady(authStore: AuthStoreType) {
+  return toObservable(authStore.sessionStatus).pipe(
+    filter((status: SessionStatus) => status !== 'bootstrapping'),
+    take(1)
+  );
+}
 
 export const authGuard: CanActivateFn = () => {
   const authStore = inject(AuthStore) as unknown as AuthStoreType;
   const router = inject(Router);
 
-  if (authStore.isAuthenticated()) {
-    return true;
-  }
-
-  return router.createUrlTree(['/login']);
+  return waitForSessionReady(authStore).pipe(
+    map((): boolean | UrlTree =>
+      authStore.isAuthenticated() ? true : router.createUrlTree(['/login'])
+    )
+  );
 };
 
 export const redirectIfLoggedInGuard: CanActivateFn = () => {
   const authStore = inject(AuthStore) as unknown as AuthStoreType;
   const router = inject(Router);
 
-  if (authStore.isAuthenticated()) {
-    return router.createUrlTree(['/admin']);
-  }
+  return waitForSessionReady(authStore).pipe(
+    map((): boolean | UrlTree =>
+      authStore.isAuthenticated() ? router.createUrlTree(['/admin']) : true
+    )
+  );
+};
 
-  return true;
+/** Route data: `{ permissions: string[] }` — user needs any one. */
+export const permissionGuard: CanActivateFn = (route) => {
+  const authStore = inject(AuthStore) as unknown as AuthStoreType;
+  const router = inject(Router);
+  const required = (route.data['permissions'] as string[] | undefined) ?? [];
+
+  return waitForSessionReady(authStore).pipe(
+    map((): boolean | UrlTree => {
+      if (!authStore.isAuthenticated()) {
+        return router.createUrlTree(['/login']);
+      }
+      if (required.length === 0 || authStore.hasAnyPermission(...required)) {
+        return true;
+      }
+      return router.createUrlTree(['/admin/dashboard']);
+    })
+  );
 };

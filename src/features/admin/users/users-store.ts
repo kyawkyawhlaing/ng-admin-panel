@@ -1,8 +1,9 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { createDebouncedTask, SEARCH_DEBOUNCE_MS } from '../../../shared/util/debounce';
 import { UsersTable } from '../../../types/database';
 
 export interface UsersState {
@@ -31,8 +32,9 @@ const initialState: UsersState = {
 
 export const UsersStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
-    
+  withMethods((store, http = inject(HttpClient), toast = inject(ToastService)) => {
+    const debouncedSearch = createDebouncedTask(SEARCH_DEBOUNCE_MS);
+
     const loadUsers = async (background: boolean = false) => {
       if (!background) {
         patchState(store, { isLoading: true });
@@ -48,7 +50,7 @@ export const UsersStore = signalStore(
         };
 
         const response = await lastValueFrom(
-          http.post<{ metadata: { totalCount: number }, items: UsersTable[] }>('https://localhost:5001/users/list', payload)
+          http.post<{ metadata: { totalCount: number }, items: UsersTable[] }>('/users/list', payload)
         );
 
         patchState(store, { 
@@ -64,11 +66,10 @@ export const UsersStore = signalStore(
 
     return {
       pagedUsers: computed(() => store.users()),
-      totalUsersCount: computed(() => store.totalUsersCount()),
 
       async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
-        await loadUsers(true);
+        debouncedSearch.schedule(() => loadUsers(true));
       },
 
       async setLockoutFilter(filter: 'all' | 'locked' | 'active') {
@@ -116,22 +117,22 @@ export const UsersStore = signalStore(
 
       async addUser(user: any) {
         try {
-          await lastValueFrom(http.post('https://localhost:5001/users', user));
-          snackBar.open('User successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await lastValueFrom(http.post('/users', user));
+          toast.success('User successfully created!');
           await loadUsers(true);
         } catch (err: any) {
-          snackBar.open(`Failed to create user: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to create user: ${err.message || 'Unknown error'}`);
           console.error('Error adding user:', err);
         }
       },
 
       async editUser(id: string, user: any) {
         try {
-          await lastValueFrom(http.put(`https://localhost:5001/users/${id}`, user));
-          snackBar.open('User successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await lastValueFrom(http.put(`/users/${id}`, user));
+          toast.success('User successfully updated!');
           await loadUsers(true);
         } catch (err: any) {
-          snackBar.open(`Failed to update user: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to update user: ${err.message || 'Unknown error'}`);
           console.error('Error editing user:', err);
         }
       },
@@ -142,12 +143,11 @@ export const UsersStore = signalStore(
         if (!user) return;
         
         try {
-          const payload = { 
-            lockout_enabled: true, 
-            is_locked_out: !user.is_locked_out 
+          const payload = {
+            is_locked_out: !user.is_locked_out
           };
           // Simulate toggle locally until endpoint is fully ready or just call put
-          await lastValueFrom(http.put(`https://localhost:5001/users/${userId}`, payload));
+          await lastValueFrom(http.put(`/users/${userId}`, payload));
           await loadUsers(true);
         } catch (err) {
            console.error('Error toggling lockout:', err);

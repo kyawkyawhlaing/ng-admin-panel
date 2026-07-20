@@ -46,10 +46,6 @@ export interface UsersTable {
   email: string;
   first_name: string;
   last_name: string;
-  password_hash: string;
-  password_salt: string;
-  refresh_token: string | null;
-  refresh_token_expiry_time: string | Date | null;
   first_time_login: boolean;
   two_factor_enabled: boolean;
   access_failed_count: number;
@@ -60,6 +56,7 @@ export interface UsersTable {
   created_at: string | Date;
   updated_by: string;
   last_updated_at: string | Date | null;
+  /** Write-only field used by create-user forms — never returned by API. */
   password?: string;
   preferences?: {
     security_alerts: boolean;

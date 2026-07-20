@@ -1,8 +1,9 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { createDebouncedTask, SEARCH_DEBOUNCE_MS } from '../../../shared/util/debounce';
 import { MenusTable } from '../../../types/database';
 
 export interface MenusState {
@@ -29,24 +30,46 @@ const initialState: MenusState = {
 
 export const MenusStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
-    // We remove the local computed properties for sortedMenus and filteredMenus
-    // since we're using server-side pagination now.
-    const pagedMenus = computed(() => store.menus());
-    const totalMenusCount = computed(() => store.totalMenusCount());
+  withMethods((store, http = inject(HttpClient), toast = inject(ToastService)) => {
+    const debouncedSearch = createDebouncedTask(SEARCH_DEBOUNCE_MS);
+
+    const loadMenus = async (background: boolean = false) => {
+      if (!background) {
+        patchState(store, { isLoading: true, error: null });
+      } else {
+        patchState(store, { error: null });
+      }
+      try {
+        const payload = {
+          searchTerm: store.filterText() || null,
+          sorts: store.sorts().map(s => ({ field: s.field, direction: s.direction })),
+          pageNumber: store.pageIndex() + 1,
+          pageSize: store.pageSize()
+        };
+        const response = await lastValueFrom(
+          http.post<{ items: MenusTable[]; metadata: { totalCount: number } }>('/menus/list', payload)
+        );
+        patchState(store, {
+          menus: response.items,
+          totalMenusCount: response.metadata.totalCount,
+          isLoading: false
+        });
+      } catch (err: any) {
+        patchState(store, { error: err.message, isLoading: false });
+      }
+    };
 
     return {
-      pagedMenus,
-      totalMenusCount,
+      pagedMenus: computed(() => store.menus()),
 
       setFilterText(text: string): void {
         patchState(store, { filterText: text, pageIndex: 0 });
-        this.loadMenus(true);
+        debouncedSearch.schedule(() => loadMenus(true));
       },
 
       setPage(index: number, size: number): void {
         patchState(store, { pageIndex: index, pageSize: size });
-        this.loadMenus(true);
+        void loadMenus(true);
       },
 
       toggleSort(field: keyof MenusTable, multi: boolean = false): void {
@@ -67,52 +90,34 @@ export const MenusStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
-        this.loadMenus(true);
+        void loadMenus(true);
       },
 
       clearSorts(): void {
         patchState(store, { sorts: [] });
-        this.loadMenus(true);
+        void loadMenus(true);
       },
 
-      async loadMenus(background: boolean = false) {
-        if (!background) {
-          patchState(store, { isLoading: true, error: null });
-        } else {
-          patchState(store, { error: null });
-        }
-        try {
-          const payload = {
-            searchTerm: store.filterText() || null,
-            sorts: store.sorts().map(s => ({ field: s.field, direction: s.direction })),
-            pageNumber: store.pageIndex() + 1,
-            pageSize: store.pageSize()
-          };
-          const response = await lastValueFrom(http.post<{ items: MenusTable[], metadata: { totalCount: number } }>('https://localhost:5001/menus/list', payload));
-          patchState(store, { menus: response.items, totalMenusCount: response.metadata.totalCount, isLoading: false });
-        } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
-        }
-      },
+      loadMenus,
 
       async addMenu(menu: any) {
         try {
-          await lastValueFrom(http.post('https://localhost:5001/menus', menu));
-          snackBar.open('Menu successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
-          await this.loadMenus(true);
+          await lastValueFrom(http.post('/menus', menu));
+          toast.success('Menu successfully created!');
+          await loadMenus(true);
         } catch (err: any) {
-          snackBar.open(`Failed to create menu: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to create menu: ${err.message || 'Unknown error'}`);
           console.error('Error adding menu:', err);
         }
       },
 
       async editMenu(id: number, menu: any) {
         try {
-          await lastValueFrom(http.put(`https://localhost:5001/menus/${id}`, menu));
-          snackBar.open('Menu successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
-          await this.loadMenus(true);
+          await lastValueFrom(http.put(`/menus/${id}`, menu));
+          toast.success('Menu successfully updated!');
+          await loadMenus(true);
         } catch (err: any) {
-          snackBar.open(`Failed to update menu: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          toast.error(`Failed to update menu: ${err.message || 'Unknown error'}`);
           console.error('Error editing menu:', err);
         }
       }

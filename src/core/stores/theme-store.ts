@@ -7,7 +7,7 @@ export interface ThemeState {
 }
 
 const initialState: ThemeState = {
-  theme: 'light',
+  theme: 'dark',
 };
 
 export const ThemeStore = signalStore(
@@ -15,7 +15,7 @@ export const ThemeStore = signalStore(
   withState(initialState),
   withMethods((store, platformId = inject(PLATFORM_ID)) => {
     const isBrowser = isPlatformBrowser(platformId);
-    
+
     return {
       initTheme(): void {
         if (isBrowser) {
@@ -23,9 +23,7 @@ export const ThemeStore = signalStore(
           if (stored === 'light' || stored === 'dark') {
             patchState(store, { theme: stored });
           } else {
-            // Check system preference
-            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            patchState(store, { theme: prefersDark ? 'dark' : 'light' });
+            patchState(store, { theme: 'dark' });
           }
         }
       },
@@ -41,10 +39,10 @@ export const ThemeStore = signalStore(
   withHooks({
     onInit(store) {
       store.initTheme();
-      
+
       const platformId = inject(PLATFORM_ID);
       const isBrowser = isPlatformBrowser(platformId);
-      
+
       effect(() => {
         const theme = store.theme();
         if (isBrowser) {

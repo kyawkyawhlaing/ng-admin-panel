@@ -16,6 +16,8 @@ export interface Permission {
   name: string;
   description: string;
   code: string;
+  resource?: string;
+  action?: string;
 }
 
 export interface Menu {

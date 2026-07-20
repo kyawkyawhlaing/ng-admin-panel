@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, redirectIfLoggedInGuard } from '../core/guards/auth.guard';
+import { authGuard, redirectIfLoggedInGuard, permissionGuard } from '../core/guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -33,18 +33,26 @@ export const routes: Routes = [
       },
       {
         path: 'users',
+        canActivate: [permissionGuard],
+        data: { permissions: ['users_access'] },
         loadComponent: () => import('../features/admin/users/users').then(m => m.UsersComponent)
       },
       {
         path: 'roles',
+        canActivate: [permissionGuard],
+        data: { permissions: ['roles_access'] },
         loadComponent: () => import('../features/admin/roles/roles').then(m => m.RolesComponent)
       },
       {
         path: 'permissions',
+        canActivate: [permissionGuard],
+        data: { permissions: ['permissions_access'] },
         loadComponent: () => import('../features/admin/permissions/permissions').then(m => m.PermissionsComponent)
       },
       {
         path: 'menus',
+        canActivate: [permissionGuard],
+        data: { permissions: ['menus_access'] },
         loadComponent: () => import('../features/admin/menus/menus').then(m => m.MenusComponent)
       },
       {
