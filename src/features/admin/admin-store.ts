@@ -1,5 +1,7 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
-import { computed, Signal } from '@angular/core';
+import { computed, Signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { lastValueFrom } from 'rxjs';
 import { withCallState, setLoading, setLoaded, setError, CallState } from '../../core/stores/features/with-call-state';
 import { User, Role, Permission, Menu, UserRoleMapping, RolePermissionMapping, PermissionMenuMapping } from '../../types/rbac';
 
@@ -19,11 +21,7 @@ const initialAdminState: AdminState = {
     { id: 'u2', name: 'John Doe', email: 'john.doe@example.com', status: 'Active' },
     { id: 'u3', name: 'Alice Smith', email: 'alice.smith@example.com', status: 'Active' }
   ],
-  roles: [
-    { id: 'r1', name: 'Super Admin', description: 'Unrestricted access to all modules and configurations' },
-    { id: 'r2', name: 'User Administrator', description: 'Can view and modify system user accounts' },
-    { id: 'r3', name: 'Security Manager', description: 'Configures roles and permissions mapping' }
-  ],
+  roles: [],
   permissions: [
     { id: 'p1', name: 'Read Users', description: 'Can view user management list', code: 'read:users' },
     { id: 'p2', name: 'Write Users', description: 'Can add, edit, or delete users', code: 'write:users' },
@@ -39,11 +37,7 @@ const initialAdminState: AdminState = {
     { id: 'm4', title: 'Permissions', route: '/admin/permissions', icon: 'M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-.999.43-1.563A6 6 0 1 1 21.75 8.25Z' },
     { id: 'm5', title: 'Menus', route: '/admin/menus', icon: 'M3.75 5.25h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5m-16.5 4.5h16.5' }
   ],
-  userRoles: [
-    { userId: 'u1', roleId: 'r1' }, // Sarah Connor -> Super Admin
-    { userId: 'u2', roleId: 'r2' }, // John Doe -> User Administrator
-    { userId: 'u3', roleId: 'r3' }  // Alice Smith -> Security Manager
-  ],
+  userRoles: [],
   rolePermissions: [
     // Super Admin permissions (All)
     { roleId: 'r1', permissionId: 'p1' },
@@ -72,7 +66,7 @@ export const AdminStore = signalStore(
   { providedIn: 'root' },
   withState(initialAdminState),
   withCallState(),
-  withMethods((store) => {
+  withMethods((store, http = inject(HttpClient)) => {
     // Helper to simulate network latency
     const simulateApiCall = <T>(action: () => T, delay = 800): Promise<T> => {
       patchState(store, setLoading());
@@ -92,42 +86,97 @@ export const AdminStore = signalStore(
     };
 
     return {
-      // Users to Roles Mappings CRUD
-      assignRoleToUser(userId: string, roleId: string): Promise<void> {
-        return simulateApiCall(() => {
-          const exists = store.userRoles().some(m => m.userId === userId && m.roleId === roleId);
-          if (exists) {
-            throw new Error(`Role is already assigned to this user.`);
-          }
-          const updated = [...store.userRoles(), { userId, roleId }];
-          patchState(store, { userRoles: updated });
-        });
+      // Backend Synced Loaders
+      async loadRealData(): Promise<void> {
+        try {
+          // Fetch all roles without pagination for assignment dropdowns
+          const payload = { searchTerm: null, sorts: [], pageNumber: 1, pageSize: 1000 };
+          const response = await lastValueFrom(
+            http.post<{ items: any[] }>('https://localhost:5001/roles/list', payload)
+          );
+          const backendRoles = response.items.map(r => ({
+            id: r.id.toString(),
+            name: r.name,
+            description: `Normalized: ${r.normalized_name}`
+          }));
+
+          // Fetch all permissions without pagination for assignment dropdowns
+          const permResponse = await lastValueFrom(
+            http.post<{ items: any[] }>('https://localhost:5001/permissions/list', payload)
+          );
+          const backendPermissions = permResponse.items.map(p => ({
+            id: p.id.toString(),
+            name: p.name,
+            description: p.description || '',
+            code: `${p.resource}_${p.action}`
+          }));
+
+          const mappings = await lastValueFrom(http.get<{userId: string, roleId: number}[]>('https://localhost:5001/users/roles-mapping'));
+          const formatted = mappings.map(m => ({ userId: m.userId, roleId: m.roleId.toString() }));
+
+          const rolePermMappings = await lastValueFrom(http.get<{roleId: number, permissionId: number}[]>('https://localhost:5001/roles/permissions-mapping'));
+          const formattedRolePerms = rolePermMappings.map(m => ({ roleId: m.roleId.toString(), permissionId: m.permissionId.toString() }));
+
+          patchState(store, { roles: backendRoles, permissions: backendPermissions, userRoles: formatted, rolePermissions: formattedRolePerms });
+        } catch (err) {
+          console.error("Error loading real data for admin store", err);
+        }
       },
 
-      removeRoleFromUser(userId: string, roleId: string): Promise<void> {
-        return simulateApiCall(() => {
-          const updated = store.userRoles().filter(m => !(m.userId === userId && m.roleId === roleId));
+      // Users to Roles Mappings CRUD
+      async assignRoleToUser(userId: string, roleId: string): Promise<void> {
+        patchState(store, setLoading());
+        try {
+          const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
+          await lastValueFrom(http.post('https://localhost:5001/users/assign-roles', { userId, roleId: numRoleId }));
+          const updated = [...store.userRoles(), { userId, roleId: roleId.toString() }];
           patchState(store, { userRoles: updated });
-        });
+          patchState(store, setLoaded());
+        } catch (err: any) {
+          patchState(store, setError(err.message));
+        }
+      },
+
+      async removeRoleFromUser(userId: string, roleId: string): Promise<void> {
+        patchState(store, setLoading());
+        try {
+          const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
+          await lastValueFrom(http.post('https://localhost:5001/users/remove-roles', { userId, roleId: numRoleId }));
+          const updated = store.userRoles().filter(m => !(m.userId === userId && m.roleId === roleId.toString()));
+          patchState(store, { userRoles: updated });
+          patchState(store, setLoaded());
+        } catch (err: any) {
+          patchState(store, setError(err.message));
+        }
       },
 
       // Roles to Permissions Mappings CRUD
-      assignPermissionToRole(roleId: string, permissionId: string): Promise<void> {
-        return simulateApiCall(() => {
-          const exists = store.rolePermissions().some(m => m.roleId === roleId && m.permissionId === permissionId);
-          if (exists) {
-            throw new Error(`Permission is already assigned to this role.`);
-          }
-          const updated = [...store.rolePermissions(), { roleId, permissionId }];
+      async assignPermissionToRole(roleId: string, permissionId: string): Promise<void> {
+        patchState(store, setLoading());
+        try {
+          const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
+          const numPermissionId = typeof permissionId === 'string' ? parseInt(permissionId, 10) : permissionId;
+          await lastValueFrom(http.post('https://localhost:5001/roles/assign-permission', { roleId: numRoleId, permissionId: numPermissionId }));
+          const updated = [...store.rolePermissions(), { roleId: roleId.toString(), permissionId: permissionId.toString() }];
           patchState(store, { rolePermissions: updated });
-        });
+          patchState(store, setLoaded());
+        } catch (err: any) {
+          patchState(store, setError(err.message));
+        }
       },
 
-      removePermissionFromRole(roleId: string, permissionId: string): Promise<void> {
-        return simulateApiCall(() => {
-          const updated = store.rolePermissions().filter(m => !(m.roleId === roleId && m.permissionId === permissionId));
+      async removePermissionFromRole(roleId: string, permissionId: string): Promise<void> {
+        patchState(store, setLoading());
+        try {
+          const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
+          const numPermissionId = typeof permissionId === 'string' ? parseInt(permissionId, 10) : permissionId;
+          await lastValueFrom(http.post('https://localhost:5001/roles/remove-permission', { roleId: numRoleId, permissionId: numPermissionId }));
+          const updated = store.rolePermissions().filter(m => !(m.roleId === roleId.toString() && m.permissionId === permissionId.toString()));
           patchState(store, { rolePermissions: updated });
-        });
+          patchState(store, setLoaded());
+        } catch (err: any) {
+          patchState(store, setError(err.message));
+        }
       },
 
       // Permissions to Menus Mappings CRUD
@@ -193,6 +242,8 @@ export interface AdminStoreType {
   removePermissionFromRole(roleId: string, permissionId: string): Promise<void>;
   assignMenuToPermission(permissionId: string, menuId: string): Promise<void>;
   removeMenuFromPermission(permissionId: string, menuId: string): Promise<void>;
+
+  loadRealData(): Promise<void>;
 
   getRolesForUser(userId: string): Role[];
   getPermissionsForRole(roleId: string): Permission[];

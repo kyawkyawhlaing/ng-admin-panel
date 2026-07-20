@@ -6,11 +6,13 @@ import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
+import { SkeletonTableComponent } from '../../../shared/components/skeleton-table';
 import { AdminStore, AdminStoreType } from '../admin-store';
 import { RolesStore } from './roles-store';
 import { AssignmentDialogComponent } from '../../../shared/components/assignment-dialog';
 import { Permission } from '../../../types/rbac';
 import { RolesTable } from '../../../types/database';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, ShieldCheck, Edit } from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-roles',
@@ -21,9 +23,18 @@ import { RolesTable } from '../../../types/database';
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    AssignmentDialogComponent
+    AssignmentDialogComponent,
+    SkeletonTableComponent,
+    LucideAngularModule
   ],
-  providers: [RolesStore],
+  providers: [
+    RolesStore,
+    {
+      provide: LUCIDE_ICONS,
+      multi: true,
+      useValue: new LucideIconProvider({ ShieldCheck, Edit })
+    }
+  ],
   template: `
     <div class="space-y-6">
       <!-- Header Section -->
@@ -91,24 +102,19 @@ import { RolesTable } from '../../../types/database';
         </div>
       </div>
 
-      <!-- CallState Feedback -->
+      <!-- Loading State -->
       @if (rolesStore.isLoading()) {
-        <div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-2">
-          <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span>Loading data...</span>
+        <app-skeleton-table 
+          [columns]="['ID', 'Name', 'Normalized Name', 'Permissions', 'Actions']"
+          [rows]="rolesStore.pageSize()" 
+        />
+      } @else if (rolesStore.error()) {
+        <div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-600 dark:text-red-400">
+          {{ rolesStore.error() }}
         </div>
-      }
-      @if (rolesStore.error(); as err) {
-        <div class="rounded-md bg-red-50 dark:bg-red-950/40 p-4 border border-red-200 dark:border-red-900/60 text-sm text-red-800 dark:text-red-400">
-          {{ err }}
-        </div>
-      }
-
-      <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 sm:rounded-xl shadow-xs">
-        <table mat-table [dataSource]="rolesStore.pagedRoles()" class="w-full !bg-white dark:!bg-slate-800">
+      } @else {
+        <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 sm:rounded-xl shadow-xs">
+          <table mat-table [dataSource]="rolesStore.pagedRoles()" class="w-full !bg-white dark:!bg-slate-800">
           
           <!-- ID Column -->
           <ng-container matColumnDef="id">
@@ -185,9 +191,7 @@ import { RolesTable } from '../../../types/database';
                   class="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 transition-colors font-semibold cursor-pointer"
                   title="Assign Permissions"
                 >
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
+                  <lucide-icon name="shield-check" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                 </button>
                 <button 
                   type="button" 
@@ -195,9 +199,7 @@ import { RolesTable } from '../../../types/database';
                   class="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors font-semibold cursor-pointer"
                   title="Edit Role"
                 >
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
+                  <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
                 </button>
               </div>
             </td>
@@ -228,6 +230,7 @@ import { RolesTable } from '../../../types/database';
           class="!bg-transparent border-t border-slate-100 dark:border-slate-700"
         />
       </div>
+      }
     </div>
 
     <!-- Permission Assignment Dialog -->
@@ -352,6 +355,7 @@ export class RolesComponent implements OnInit {
 
   ngOnInit() {
     this.rolesStore.loadRoles();
+    this.adminStore.loadRealData();
   }
 
   protected onHeaderClick(field: keyof RolesTable, event: MouseEvent): void {

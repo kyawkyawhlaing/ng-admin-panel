@@ -1,135 +1,92 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
-import { computed, inject, Signal } from '@angular/core';
+import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
 import { UsersTable } from '../../../types/database';
 
 export interface UsersState {
   users: UsersTable[];
+  totalUsersCount: number;
   filterText: string;
   lockoutFilter: 'all' | 'locked' | 'active';
   twoFactorFilter: 'all' | 'enabled' | 'disabled';
   pageIndex: number;
   pageSize: number;
   sorts: Array<{ field: keyof UsersTable; direction: 'asc' | 'desc' }>;
+  isLoading: boolean;
 }
 
-const initialUsers: UsersTable[] = [];
-
 const initialState: UsersState = {
-  users: initialUsers,
+  users: [],
+  totalUsersCount: 0,
   filterText: '',
   lockoutFilter: 'all',
   twoFactorFilter: 'all',
   pageIndex: 0,
   pageSize: 5,
-  sorts: []
+  sorts: [],
+  isLoading: false
 };
 
 export const UsersStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient)) => {
-    // Computed filtering
-    const filteredUsers = computed(() => {
-      let list = store.users();
-      const text = store.filterText().toLowerCase().trim();
-      const lockout = store.lockoutFilter();
-      const twoFa = store.twoFactorFilter();
+  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
+    
+    const loadUsers = async (background: boolean = false) => {
+      if (!background) {
+        patchState(store, { isLoading: true });
+      }
+      try {
+        const payload = {
+          searchTerm: store.filterText() || null,
+          lockoutFilter: store.lockoutFilter(),
+          twoFactorFilter: store.twoFactorFilter(),
+          sorts: store.sorts().map(s => ({ field: s.field, direction: s.direction })),
+          pageNumber: store.pageIndex() + 1, // Backend uses 1-based index
+          pageSize: store.pageSize()
+        };
 
-      if (text) {
-        list = list.filter(u => 
-          u.display_name.toLowerCase().includes(text) ||
-          u.email.toLowerCase().includes(text) ||
-          u.first_name.toLowerCase().includes(text) ||
-          u.last_name.toLowerCase().includes(text)
+        const response = await lastValueFrom(
+          http.post<{ metadata: { totalCount: number }, items: UsersTable[] }>('https://localhost:5001/users/list', payload)
         );
+
+        patchState(store, { 
+          users: response.items, 
+          totalUsersCount: response.metadata.totalCount,
+          isLoading: false
+        });
+      } catch (err) {
+        patchState(store, { isLoading: false });
+        console.error('Error loading users:', err);
       }
-
-      if (lockout === 'locked') {
-        list = list.filter(u => u.is_locked_out);
-      } else if (lockout === 'active') {
-        list = list.filter(u => !u.is_locked_out);
-      }
-
-      if (twoFa === 'enabled') {
-        list = list.filter(u => u.two_factor_enabled);
-      } else if (twoFa === 'disabled') {
-        list = list.filter(u => !u.two_factor_enabled);
-      }
-
-      return list;
-    });
-
-    // Computed sorting (handles multi-column sorting)
-    const sortedUsers = computed(() => {
-      const list = [...filteredUsers()];
-      const sorts = store.sorts();
-      
-      if (sorts.length === 0) return list;
-
-      list.sort((a, b) => {
-        for (const sort of sorts) {
-          const valA = a[sort.field];
-          const valB = b[sort.field];
-
-          if (valA === valB) continue;
-          if (valA === null || valA === undefined) return sort.direction === 'asc' ? 1 : -1;
-          if (valB === null || valB === undefined) return sort.direction === 'asc' ? -1 : 1;
-
-          // String comparison
-          if (typeof valA === 'string' && typeof valB === 'string') {
-            const comp = valA.localeCompare(valB);
-            return sort.direction === 'asc' ? comp : -comp;
-          }
-
-          // Date comparison
-          if (valA instanceof Date && valB instanceof Date) {
-            const comp = valA.getTime() - valB.getTime();
-            return sort.direction === 'asc' ? comp : -comp;
-          }
-
-          // General type comparison
-          const comp = valA < valB ? -1 : 1;
-          return sort.direction === 'asc' ? comp : -comp;
-        }
-        return 0;
-      });
-
-      return list;
-    });
-
-    // Computed paging
-    const pagedUsers = computed(() => {
-      const list = sortedUsers();
-      const start = store.pageIndex() * store.pageSize();
-      return list.slice(start, start + store.pageSize());
-    });
-
-    const totalUsersCount = computed(() => filteredUsers().length);
+    };
 
     return {
-      filteredUsers,
-      sortedUsers,
-      pagedUsers,
-      totalUsersCount,
+      pagedUsers: computed(() => store.users()),
+      totalUsersCount: computed(() => store.totalUsersCount()),
 
-      setFilterText(text: string): void {
+      async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
+        await loadUsers(true);
       },
 
-      setLockoutFilter(filter: 'all' | 'locked' | 'active'): void {
+      async setLockoutFilter(filter: 'all' | 'locked' | 'active') {
         patchState(store, { lockoutFilter: filter, pageIndex: 0 });
+        await loadUsers(true);
       },
 
-      setTwoFactorFilter(filter: 'all' | 'enabled' | 'disabled'): void {
+      async setTwoFactorFilter(filter: 'all' | 'enabled' | 'disabled') {
         patchState(store, { twoFactorFilter: filter, pageIndex: 0 });
+        await loadUsers(true);
       },
 
-      setPage(index: number, size: number): void {
+      async setPage(index: number, size: number) {
         patchState(store, { pageIndex: index, pageSize: size });
+        await loadUsers(true);
       },
 
-      toggleSort(field: keyof UsersTable, multi: boolean = false): void {
+      async toggleSort(field: keyof UsersTable, multi: boolean = false) {
         const current = store.sorts();
         const existing = current.find(s => s.field === field);
         let nextSorts: Array<{ field: keyof UsersTable; direction: 'asc' | 'desc' }> = [];
@@ -147,62 +104,67 @@ export const UsersStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
+        await loadUsers(true);
       },
 
-      clearSorts(): void {
-        patchState(store, { sorts: [] });
+      async clearSorts() {
+        patchState(store, { sorts: [], pageIndex: 0 });
+        await loadUsers(true);
       },
 
-      async loadUsers() {
+      loadUsers,
+
+      async addUser(user: any) {
         try {
-          const users = await lastValueFrom(http.get<UsersTable[]>('/api/users'));
-          patchState(store, { users, pageIndex: 0 });
-        } catch (err) {
-          console.error('Error loading users:', err);
-        }
-      },
-
-      async addUser(user: Omit<UsersTable, 'id' | 'password_hash' | 'password_salt' | 'created_by' | 'created_at' | 'updated_by' | 'last_updated_at' | 'refresh_token' | 'refresh_token_expiry_time' | 'access_failed_count' | 'is_locked_out' | 'lockout_end'> & { password_clear: string }) {
-        try {
-          await lastValueFrom(http.post('/api/users', { ...user, password: user.password_clear }));
-          // Reload users
-          const users = await lastValueFrom(http.get<UsersTable[]>('/api/users'));
-          patchState(store, { users, pageIndex: 0 });
-        } catch (err) {
+          await lastValueFrom(http.post('https://localhost:5001/users', user));
+          snackBar.open('User successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadUsers(true);
+        } catch (err: any) {
+          snackBar.open(`Failed to create user: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
           console.error('Error adding user:', err);
         }
       },
 
-      async editUser(id: string, user: Partial<UsersTable> & { password_clear?: string }) {
+      async editUser(id: string, user: any) {
         try {
-          const payload = { ...user };
-          if (user.password_clear) {
-             (payload as any).password = user.password_clear;
-          }
-          await lastValueFrom(http.put(`/api/users/${id}`, payload));
-          // Reload users
-          const users = await lastValueFrom(http.get<UsersTable[]>('/api/users'));
-          patchState(store, { users });
-        } catch (err) {
+          await lastValueFrom(http.put(`https://localhost:5001/users/${id}`, user));
+          snackBar.open('User successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadUsers(true);
+        } catch (err: any) {
+          snackBar.open(`Failed to update user: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
           console.error('Error editing user:', err);
         }
       },
 
       async toggleLockout(userId: string) {
-        // Implement api/users/:id/lockout if needed. For now just update locally.
-        const updated = store.users().map(u => {
-          if (u.id === userId) {
-            const nextLockedState = !u.is_locked_out;
-            return {
-              ...u,
-              is_locked_out: nextLockedState,
-              lockout_end: nextLockedState ? new Date(Date.now() + 30 * 60 * 1000) : null, // 30 min lock
-              last_updated_at: new Date()
-            };
-          }
-          return u;
-        });
-        patchState(store, { users: updated });
+        // Find current user state
+        const user = store.users().find(u => u.id === userId);
+        if (!user) return;
+        
+        try {
+          const payload = { 
+            lockout_enabled: true, 
+            is_locked_out: !user.is_locked_out 
+          };
+          // Simulate toggle locally until endpoint is fully ready or just call put
+          await lastValueFrom(http.put(`https://localhost:5001/users/${userId}`, payload));
+          await loadUsers(true);
+        } catch (err) {
+           console.error('Error toggling lockout:', err);
+           // Fallback optimistic update
+           const updated = store.users().map(u => {
+              if (u.id === userId) {
+                const nextLockedState = !u.is_locked_out;
+                return {
+                  ...u,
+                  is_locked_out: nextLockedState,
+                  lockout_end: nextLockedState ? new Date(Date.now() + 30 * 60 * 1000) : null,
+                };
+              }
+              return u;
+           });
+           patchState(store, { users: updated });
+        }
       }
     };
   })

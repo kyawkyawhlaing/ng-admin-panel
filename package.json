@@ -6,8 +6,7 @@
     "start": "ng serve",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test",
-    "serve:ssr:ng-admin-panel": "node dist/ng-admin-panel/server/server.mjs"
+    "test": "ng test"
   },
   "private": true,
   "packageManager": "pnpm@11.6.0",
@@ -20,13 +19,9 @@
     "@angular/forms": "^22.0.0",
     "@angular/material": "^22.0.1",
     "@angular/platform-browser": "^22.0.0",
-    "@angular/platform-server": "^22.0.0",
     "@angular/router": "^22.0.0",
-    "@angular/ssr": "^22.0.1",
     "@ngrx/signals": "^21.1.1",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.3",
-    "pg": "^8.21.0",
+    "lucide-angular": "^1.0.0",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },
@@ -35,15 +30,13 @@
     "@angular/cli": "^22.0.1",
     "@angular/compiler-cli": "^22.0.0",
     "@tailwindcss/postcss": "^4.1.12",
-    "@types/express": "^5.0.1",
-    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.17.19",
-    "@types/pg": "^8.20.0",
     "jsdom": "^28.0.0",
     "postcss": "^8.5.3",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.1.12",
     "typescript": "~6.0.2",
+    "undici": "^8.4.1",
     "vitest": "^4.0.8"
   }
 }

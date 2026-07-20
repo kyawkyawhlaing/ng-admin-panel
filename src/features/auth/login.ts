@@ -155,6 +155,19 @@ export class LoginComponent {
     })
   });
 
+  private decodeJwt(token: string): any {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      return null;
+    }
+  }
+
   protected onSubmit(): void {
     if (this.loginForm.invalid) {
       this.loginForm.markAllAsTouched();
@@ -167,16 +180,37 @@ export class LoginComponent {
     const email = this.loginForm.controls.email.value;
     const password = this.loginForm.controls.password.value;
 
-    this.http.post<{ token: string; user: any }>('/api/auth/login', { email, password }).subscribe({
+    this.http.post<{ accessToken: string }>('https://localhost:5001/users/login', { email, password }, { withCredentials: true }).subscribe({
       next: (response) => {
-        const { token, user } = response;
-        const roles = user.roles ? user.roles.map((r: any) => r.name) : [];
-        
+        const token = response.accessToken;
+        const decoded = this.decodeJwt(token);
+
+        if (!decoded) {
+          this.errorMessage.set('Invalid authentication token.');
+          this.isLoading.set(false);
+          return;
+        }
+
+        let roles: string[] = [];
+        try { roles = typeof decoded.roles === 'string' ? JSON.parse(decoded.roles) : (decoded.roles || []); } catch(e) {}
+
+        let resourceAccess: any[] = [];
+        try { resourceAccess = typeof decoded.resource_access === 'string' ? JSON.parse(decoded.resource_access) : (decoded.resource_access || []); } catch(e) {}
+
+        const permissions: string[] = [];
+        resourceAccess.forEach((ra: any) => {
+          const perms = ra.Permissions || ra.permissions || [];
+          permissions.push(...perms);
+        });
+
+        const userEmail = decoded.email || email;
+        const userId = decoded.sub || '';
+
         this.authStore.setAuth(
-          { id: user.id.toString(), email: user.email, name: user.displayName || `${user.firstName} ${user.lastName}` },
+          { id: userId, email: userEmail, name: userEmail.split('@')[0] },
           token,
           roles,
-          [] // Permissions are not returned yet
+          permissions
         );
         this.isLoading.set(false);
         this.router.navigate(['/admin/dashboard']);

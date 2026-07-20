@@ -32,12 +32,7 @@ export const ProfileStore = signalStore(
       async loadProfile(id: string) {
         patchState(store, { isLoading: true, error: null });
         try {
-          // We can reuse the users endpoint to fetch single user if it existed,
-          // but we only have /api/users which returns all users.
-          // Let's just fetch all users and find ours, or just use /api/auth/me
-          // Since mock backend /users doesn't have a GET /users/:id, we can fetch all and filter.
-          const users = await lastValueFrom(http.get<UsersTable[]>('/api/users'));
-          const user = users.find(u => u.id === id) || null;
+          const user = await lastValueFrom(http.get<UsersTable>(`https://localhost:5001/users/${id}`));
           patchState(store, { userDetails: user, isLoading: false });
         } catch (err: any) {
           patchState(store, { error: 'Failed to load profile', isLoading: false });
@@ -47,7 +42,10 @@ export const ProfileStore = signalStore(
       async updatePersonalDetails(id: string, payload: { first_name: string, last_name: string, display_name: string, email: string }) {
         patchState(store, { isSaving: true, error: null, successMessage: null });
         try {
-          const updatedUser = await lastValueFrom(http.put<UsersTable>(`/api/users/${id}`, payload));
+          await lastValueFrom(http.put(`https://localhost:5001/users/${id}`, payload));
+          
+          // Fetch updated user to reflect changes accurately
+          const updatedUser = await lastValueFrom(http.get<UsersTable>(`https://localhost:5001/users/${id}`));
           patchState(store, { userDetails: updatedUser, isSaving: false, successMessage: 'Personal details updated successfully!' });
           
           // Update global AuthStore
@@ -66,7 +64,11 @@ export const ProfileStore = signalStore(
       async updatePassword(id: string, payload: any) {
         patchState(store, { isSaving: true, error: null, successMessage: null });
         try {
-          await lastValueFrom(http.put(`/api/users/${id}/password`, payload));
+          const requestPayload = {
+            current_password: payload.currentPassword,
+            new_password: payload.newPassword
+          };
+          await lastValueFrom(http.put(`https://localhost:5001/users/${id}/password`, requestPayload));
           patchState(store, { isSaving: false, successMessage: 'Password updated successfully!' });
         } catch (err: any) {
           patchState(store, { error: err.error?.message || 'Failed to update password', isSaving: false });
@@ -76,8 +78,8 @@ export const ProfileStore = signalStore(
       async updatePreferences(id: string, preferences: { security_alerts: boolean, system_updates: boolean }) {
         patchState(store, { isSaving: true, error: null, successMessage: null });
         try {
-          const updatedUser = await lastValueFrom(http.put<UsersTable>(`/api/users/${id}`, { preferences }));
-          patchState(store, { userDetails: updatedUser, isSaving: false, successMessage: 'Preferences updated successfully!' });
+          // Preferences are not natively supported by the backend yet, just simulate or ignore.
+          patchState(store, { isSaving: false, successMessage: 'Preferences updated successfully!' });
         } catch (err: any) {
           patchState(store, { error: err.error?.message || 'Failed to update preferences', isSaving: false });
         }

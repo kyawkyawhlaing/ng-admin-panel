@@ -1,11 +1,13 @@
 import { signalStore, withState, withMethods, patchState } from '@ngrx/signals';
 import { computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { lastValueFrom } from 'rxjs';
 import { RolesTable } from '../../../types/database';
 
 export interface RolesState {
   roles: RolesTable[];
+  totalRolesCount: number;
   filterText: string;
   pageIndex: number;
   pageSize: number;
@@ -16,6 +18,7 @@ export interface RolesState {
 
 const initialState: RolesState = {
   roles: [],
+  totalRolesCount: 0,
   filterText: '',
   pageIndex: 0,
   pageSize: 5,
@@ -26,75 +29,50 @@ const initialState: RolesState = {
 
 export const RolesStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient)) => {
-    // Computed filtering
-    const filteredRoles = computed(() => {
-      let list = store.roles();
-      const text = store.filterText().toLowerCase().trim();
-
-      if (text) {
-        list = list.filter(r => 
-          r.name.toLowerCase().includes(text) ||
-          r.normalized_name.toLowerCase().includes(text)
-        );
+  withMethods((store, http = inject(HttpClient), snackBar = inject(MatSnackBar)) => {
+    const loadRoles = async (background: boolean = false) => {
+      if (!background) {
+        patchState(store, { isLoading: true, error: null });
+      } else {
+        patchState(store, { error: null });
       }
-      return list;
-    });
+      try {
+        const payload = {
+          searchTerm: store.filterText() || null,
+          sorts: store.sorts().map(s => ({ field: s.field, direction: s.direction })),
+          pageNumber: store.pageIndex() + 1,
+          pageSize: store.pageSize()
+        };
 
-    // Computed sorting
-    const sortedRoles = computed(() => {
-      const list = [...filteredRoles()];
-      const sorts = store.sorts();
-      
-      if (sorts.length === 0) return list;
+        const response = await lastValueFrom(
+          http.post<{ metadata: { totalCount: number }, items: RolesTable[] }>('https://localhost:5001/roles/list', payload)
+        );
 
-      list.sort((a, b) => {
-        for (const sort of sorts) {
-          const valA = a[sort.field];
-          const valB = b[sort.field];
-
-          if (valA === valB) continue;
-          if (valA === null || valA === undefined) return sort.direction === 'asc' ? 1 : -1;
-          if (valB === null || valB === undefined) return sort.direction === 'asc' ? -1 : 1;
-
-          if (typeof valA === 'string' && typeof valB === 'string') {
-            const comp = valA.localeCompare(valB);
-            return sort.direction === 'asc' ? comp : -comp;
-          }
-
-          const comp = valA < valB ? -1 : 1;
-          return sort.direction === 'asc' ? comp : -comp;
-        }
-        return 0;
-      });
-
-      return list;
-    });
-
-    // Computed paging
-    const pagedRoles = computed(() => {
-      const list = sortedRoles();
-      const start = store.pageIndex() * store.pageSize();
-      return list.slice(start, start + store.pageSize());
-    });
-
-    const totalRolesCount = computed(() => filteredRoles().length);
+        patchState(store, { 
+          roles: response.items, 
+          totalRolesCount: response.metadata.totalCount,
+          isLoading: false 
+        });
+      } catch (err: any) {
+        patchState(store, { error: err.message, isLoading: false });
+      }
+    };
 
     return {
-      filteredRoles,
-      sortedRoles,
-      pagedRoles,
-      totalRolesCount,
+      pagedRoles: computed(() => store.roles()),
+      totalRolesCount: computed(() => store.totalRolesCount()),
 
-      setFilterText(text: string): void {
+      async setFilterText(text: string) {
         patchState(store, { filterText: text, pageIndex: 0 });
+        await loadRoles(true);
       },
 
-      setPage(index: number, size: number): void {
+      async setPage(index: number, size: number) {
         patchState(store, { pageIndex: index, pageSize: size });
+        await loadRoles(true);
       },
 
-      toggleSort(field: keyof RolesTable, multi: boolean = false): void {
+      async toggleSort(field: keyof RolesTable, multi: boolean = false) {
         const current = store.sorts();
         const existing = current.find(s => s.field === field);
         let nextSorts: Array<{ field: keyof RolesTable; direction: 'asc' | 'desc' }> = [];
@@ -112,43 +90,35 @@ export const RolesStore = signalStore(
         }
 
         patchState(store, { sorts: nextSorts, pageIndex: 0 });
+        await loadRoles(true);
       },
 
-      clearSorts(): void {
+      async clearSorts() {
         patchState(store, { sorts: [] });
+        await loadRoles(true);
       },
 
-      async loadRoles() {
-        patchState(store, { isLoading: true, error: null });
+      loadRoles,
+
+      async addRole(role: any) {
         try {
-          const roles = await lastValueFrom(http.get<RolesTable[]>('/api/roles'));
-          patchState(store, { roles, isLoading: false, pageIndex: 0 });
+          await lastValueFrom(http.post('https://localhost:5001/roles', role));
+          snackBar.open('Role successfully created!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadRoles(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to create role: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error adding role:', err);
         }
       },
 
-      async addRole(role: Omit<RolesTable, 'id'>) {
-        patchState(store, { isLoading: true, error: null });
+      async editRole(id: number, role: any) {
         try {
-          await lastValueFrom(http.post('/api/roles', role));
-          // Reload
-          const roles = await lastValueFrom(http.get<RolesTable[]>('/api/roles'));
-          patchState(store, { roles, isLoading: false, pageIndex: 0 });
+          await lastValueFrom(http.put(`https://localhost:5001/roles/${id}`, role));
+          snackBar.open('Role successfully updated!', 'Close', { duration: 3000, horizontalPosition: 'right', verticalPosition: 'bottom' });
+          await loadRoles(true);
         } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
-        }
-      },
-
-      async editRole(id: number, role: Partial<RolesTable>) {
-        patchState(store, { isLoading: true, error: null });
-        try {
-          await lastValueFrom(http.put(`/api/roles/${id}`, role));
-          // Reload
-          const roles = await lastValueFrom(http.get<RolesTable[]>('/api/roles'));
-          patchState(store, { roles, isLoading: false });
-        } catch (err: any) {
-          patchState(store, { error: err.message, isLoading: false });
+          snackBar.open(`Failed to update role: ${err.message || 'Unknown error'}`, 'Close', { duration: 5000, horizontalPosition: 'right', verticalPosition: 'bottom', panelClass: ['text-red-500'] });
+          console.error('Error editing role:', err);
         }
       }
     };

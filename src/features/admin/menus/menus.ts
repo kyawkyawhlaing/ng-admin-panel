@@ -7,9 +7,12 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatAutocompleteModule } from '@angular/material/autocomplete';
+import { MatSelectModule } from '@angular/material/select';
+import { SkeletonTableComponent } from '../../../shared/components/skeleton-table';
 import { MenusStore } from './menus-store';
 import { PermissionsStore } from '../permissions/permissions-store';
 import { MenusTable } from '../../../types/database';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Home, Settings, Users, Key, Database, Shield, Layout, FileText, Component as ComponentIcon } from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-menus',
@@ -20,9 +23,20 @@ import { MenusTable } from '../../../types/database';
     MatFormFieldModule,
     MatInputModule,
     MatButtonModule,
-    MatAutocompleteModule
+    MatAutocompleteModule,
+    MatSelectModule,
+    SkeletonTableComponent,
+    LucideAngularModule
   ],
-  providers: [MenusStore, PermissionsStore],
+  providers: [
+    MenusStore, 
+    PermissionsStore,
+    {
+      provide: LUCIDE_ICONS,
+      multi: true,
+      useValue: new LucideIconProvider({ Menu, Edit, Home, Settings, Users, Key, Database, Shield, Layout, FileText, Component: ComponentIcon })
+    }
+  ],
   template: `
     <div class="space-y-6">
       <!-- Header Section -->
@@ -90,47 +104,55 @@ import { MenusTable } from '../../../types/database';
         </div>
       </div>
 
-      <!-- CallState Feedback -->
+      <!-- Loading State -->
       @if (menusStore.isLoading()) {
-        <div class="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 py-2">
-          <svg class="animate-spin h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span>Loading data...</span>
+        <app-skeleton-table 
+          [columns]="['Icon', 'Name', 'API Path', 'Description', 'Parent ID', 'Sort Order', 'Visibility Status', 'Actions']"
+          [rows]="menusStore.pageSize()" 
+        />
+      } @else if (menusStore.error()) {
+        <div class="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-900/20 p-4 text-sm text-red-600 dark:text-red-400">
+          {{ menusStore.error() }}
         </div>
-      }
-      @if (menusStore.error(); as err) {
-        <div class="rounded-md bg-red-50 dark:bg-red-950/40 p-4 border border-red-200 dark:border-red-900/60 text-sm text-red-800 dark:text-red-400">
-          {{ err }}
-        </div>
-      }
-
-      <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 sm:rounded-xl shadow-xs">
-        <table mat-table [dataSource]="menusStore.pagedMenus()" class="w-full !bg-white dark:!bg-slate-800">
+      } @else {
+        <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 sm:rounded-xl shadow-xs">
+          <table mat-table [dataSource]="menusStore.pagedMenus()" class="w-full !bg-white dark:!bg-slate-800">
           
+          <!-- Icon Column -->
+          <ng-container matColumnDef="icon">
+            <th 
+              mat-header-cell 
+              *matHeaderCellDef
+              class="!border-b border-slate-200 dark:!border-slate-700 !py-4.5 !pl-6 !text-center !w-16 !text-xs !font-semibold !uppercase !tracking-wider !text-slate-500 dark:!text-slate-400 select-none"
+            >
+              Icon
+            </th>
+            <td mat-cell *matCellDef="let menu" class="!border-b border-slate-100 dark:!border-slate-700/60 !py-4 !pl-6 !text-center !text-slate-500 dark:!text-slate-400">
+              <div class="flex justify-center items-center">
+                @if (menu.icon) {
+                  <lucide-icon [name]="menu.icon" class="w-5 h-5 text-slate-500" [strokeWidth]="2" />
+                } @else {
+                  <lucide-icon name="menu" class="w-5 h-5 text-slate-400" [strokeWidth]="2" />
+                }
+              </div>
+            </td>
+          </ng-container>
+
           <!-- Name Column -->
           <ng-container matColumnDef="name">
             <th 
               mat-header-cell 
               *matHeaderCellDef 
               (click)="onHeaderClick('name', $event)"
-              class="!border-b border-slate-200 dark:!border-slate-700 !py-4.5 !pl-6 !text-left !text-xs !font-semibold !uppercase !tracking-wider !text-slate-500 dark:!text-slate-400 select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+              class="!border-b border-slate-200 dark:!border-slate-700 !py-4.5 !text-left !text-xs !font-semibold !uppercase !tracking-wider !text-slate-500 dark:!text-slate-400 select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
             >
               <div class="flex items-center gap-1.5">
                 <span>Name</span>
                 {{ getSortIndicator('name') }}
               </div>
             </th>
-            <td mat-cell *matCellDef="let menu" class="!border-b border-slate-100 dark:!border-slate-700/60 !py-4 !pl-6 !text-sm !font-semibold !text-slate-900 dark:!text-slate-100">
-              <div class="flex items-center gap-2">
-                @if (menu.icon) {
-                  <span class="text-slate-400">{{ menu.icon }}</span>
-                } @else {
-                  <span class="text-slate-400">☰</span>
-                }
-                <span>{{ menu.name || 'Unnamed Menu' }}</span>
-              </div>
+            <td mat-cell *matCellDef="let menu" class="!border-b border-slate-100 dark:!border-slate-700/60 !py-4 !text-sm !font-semibold !text-slate-900 dark:!text-slate-100">
+              <span>{{ menu.name || 'Unnamed Menu' }}</span>
             </td>
           </ng-container>
 
@@ -148,6 +170,24 @@ import { MenusTable } from '../../../types/database';
               </div>
             </th>
             <td mat-cell *matCellDef="let menu" class="!border-b border-slate-100 dark:!border-slate-700/60 !py-4 !text-sm !text-slate-500 dark:!text-slate-400">{{ menu.api_path }}</td>
+          </ng-container>
+
+          <!-- Description Column -->
+          <ng-container matColumnDef="description">
+            <th 
+              mat-header-cell 
+              *matHeaderCellDef 
+              (click)="onHeaderClick('description', $event)"
+              class="!border-b border-slate-200 dark:!border-slate-700 !py-4.5 !text-left !text-xs !font-semibold !uppercase !tracking-wider !text-slate-500 dark:!text-slate-400 select-none cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+            >
+              <div class="flex items-center gap-1.5">
+                <span>Description</span>
+                {{ getSortIndicator('description') }}
+              </div>
+            </th>
+            <td mat-cell *matCellDef="let menu" class="!border-b border-slate-100 dark:!border-slate-700/60 !py-4 !text-sm !text-slate-500 dark:!text-slate-400 max-w-xs truncate" [title]="menu.description">
+              {{ menu.description }}
+            </td>
           </ng-container>
 
           <!-- Parent ID Column -->
@@ -218,12 +258,10 @@ import { MenusTable } from '../../../types/database';
                 <button 
                   type="button" 
                   (click)="openCreateModal(menu)"
-                  class="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 transition-colors font-semibold cursor-pointer"
+                  class="text-slate-500 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition-colors font-semibold cursor-pointer"
                   title="Edit Menu"
                 >
-                  <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
+                  <lucide-icon name="edit" class="w-4.5 h-4.5" [strokeWidth]="2" />
                 </button>
               </div>
             </td>
@@ -254,6 +292,7 @@ import { MenusTable } from '../../../types/database';
           class="!bg-transparent border-t border-slate-100 dark:border-slate-700"
         />
       </div>
+      }
     </div>
 
     <!-- Menu Creation Modal Dialog -->
@@ -268,17 +307,25 @@ import { MenusTable } from '../../../types/database';
           <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <mat-form-field appearance="outline" class="w-full !m-0">
               <mat-label>Menu Name (Resource Mapping)</mat-label>
-              <input 
-                matInput 
-                formControlName="name" 
-                placeholder="e.g. users" 
-                [matAutocomplete]="autoName"
-              />
-              <mat-autocomplete #autoName="matAutocomplete">
+              <mat-select formControlName="name" placeholder="Select a resource mapping..." (opened)="searchInput.focus()">
+                <div class="px-3 py-2 sticky top-0 bg-white dark:bg-slate-800 z-10 border-b border-slate-100 dark:border-slate-700 mb-1">
+                  <input 
+                    #searchInput
+                    matInput 
+                    placeholder="Search resource..." 
+                    [value]="menuNameSearch()"
+                    (input)="onMenuNameInput($event)"
+                    (keydown)="$event.stopPropagation()"
+                    class="w-full text-sm outline-none bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400"
+                  />
+                </div>
                 @for (menu of filteredMenuStatuses(); track menu.status) {
                   <mat-option [value]="menu.status">{{ menu.status }}</mat-option>
                 }
-              </mat-autocomplete>
+                @if (filteredMenuStatuses().length === 0) {
+                  <div class="px-4 py-3 text-sm text-slate-500 text-center">No matching resources</div>
+                }
+              </mat-select>
               @if (menuForm.get('name')?.hasError('required') && menuForm.get('name')?.touched) {
                 <mat-error>Name is required</mat-error>
               }
@@ -370,7 +417,7 @@ export class MenusComponent implements OnInit {
 
   private createDialogRef = viewChild<ElementRef<HTMLDialogElement>>('createDialogRef');
 
-  protected readonly displayedColumns = ['name', 'api_path', 'parent_id', 'sort_order', 'status', 'actions'];
+  protected readonly displayedColumns = ['icon', 'name', 'api_path', 'description', 'parent_id', 'sort_order', 'status', 'actions'];
 
   protected readonly editingMenuId = signal<number | null>(null);
   protected readonly menuNameSearch = signal('');
@@ -400,10 +447,6 @@ export class MenusComponent implements OnInit {
         modal.addEventListener('keydown', this.trapModalFocus);
       }
     });
-
-    this.menuForm.controls.name.valueChanges
-      .pipe(takeUntilDestroyed())
-      .subscribe(val => this.menuNameSearch.set(val || ''));
   }
 
   ngOnInit() {
@@ -442,6 +485,11 @@ export class MenusComponent implements OnInit {
     this.menusStore.setPage(event.pageIndex, event.pageSize);
   }
 
+  protected onMenuNameInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.menuNameSearch.set(input.value);
+  }
+
   protected openCreateModal(menu?: MenusTable): void {
     const modal = this.createDialogRef()?.nativeElement;
     if (modal && !modal.open) {
@@ -470,6 +518,7 @@ export class MenusComponent implements OnInit {
           is_visible: true 
         });
       }
+      this.menuNameSearch.set('');
       modal.showModal();
       setTimeout(() => {
         const firstInput = modal.querySelector('input') as HTMLInputElement;
