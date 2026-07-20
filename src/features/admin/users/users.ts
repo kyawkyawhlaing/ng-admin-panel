@@ -17,7 +17,7 @@ import {
 } from '../../../shared/ui';
 import { UsersTable } from '../../../types/database';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
-import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, ShieldCheck, Lock, Unlock, Edit } from 'lucide-angular';
+import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit } from 'lucide-angular';
 
 const passwordMatchValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const password = control.get('password');
@@ -56,7 +56,7 @@ const passwordComplexityValidators = [
     {
       provide: LUCIDE_ICONS,
       multi: true,
-      useValue: new LucideIconProvider({ ShieldCheck, Lock, Unlock, Edit })
+      useValue: new LucideIconProvider({ Edit })
     }
   ],
   template: `
@@ -149,19 +149,55 @@ const passwordComplexityValidators = [
         </ng-template>
 
         <ng-template kkhCell="is_locked_out" let-row>
-          @if (row.is_locked_out) {
-            <span class="kkh-chip kkh-chip-danger">Locked Out</span>
-          } @else {
-            <span class="kkh-chip kkh-chip-ok">Active</span>
-          }
+          <button
+            type="button"
+            class="kkh-relation-summary"
+            [class.kkh-relation-summary--empty]="!row.is_locked_out"
+            [disabled]="!canEdit()"
+            (click)="canEdit() && usersStore.toggleLockout(row.id)"
+            [attr.aria-label]="row.is_locked_out ? 'Unlock account' : 'Lock account'"
+            [title]="row.is_locked_out ? 'Locked out — click to unlock' : 'Active — click to lock'"
+          >
+            <span class="kkh-relation-summary__count">
+              <span class="kkh-relation-summary__label">
+                {{ row.is_locked_out ? 'Locked Out' : 'Active' }}
+              </span>
+              @if (canEdit()) {
+                <span class="kkh-relation-summary__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </span>
+              }
+            </span>
+          </button>
         </ng-template>
 
         <ng-template kkhCell="two_factor_enabled" let-row>
-          @if (row.two_factor_enabled) {
-            <span class="kkh-chip kkh-chip-accent">2FA Active</span>
-          } @else {
-            <span class="kkh-chip kkh-chip-muted">Disabled</span>
-          }
+          <button
+            type="button"
+            class="kkh-relation-summary"
+            [class.kkh-relation-summary--empty]="!row.two_factor_enabled"
+            [disabled]="!canEdit()"
+            (click)="canEdit() && usersStore.toggleMfa(row.id)"
+            [attr.aria-label]="row.two_factor_enabled ? 'Disable MFA' : 'Enable MFA'"
+            [title]="row.two_factor_enabled ? '2FA active — click to disable' : 'Disabled — click to enable'"
+          >
+            <span class="kkh-relation-summary__count">
+              <span class="kkh-relation-summary__label">
+                {{ row.two_factor_enabled ? '2FA Active' : 'Disabled' }}
+              </span>
+              @if (canEdit()) {
+                <span class="kkh-relation-summary__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </span>
+              }
+            </span>
+          </button>
         </ng-template>
 
         <ng-template kkhCell="created_at" let-row>
@@ -171,34 +207,14 @@ const passwordComplexityValidators = [
         <ng-template kkhCell="actions" let-row>
           <div class="flex items-center justify-end gap-3">
             @if (canEdit()) {
-            <button
-              type="button"
-              (click)="openAssignDialog(row.id)"
-              class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
-              title="Assign Roles"
-            >
-              <lucide-icon name="shield-check" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
-            </button>
-            <button
-              type="button"
-              (click)="usersStore.toggleLockout(row.id)"
-              [class]="row.is_locked_out ? 'text-[var(--kkh-ok)] hover:opacity-80 transition-opacity cursor-pointer' : 'text-[var(--kkh-danger)] hover:opacity-80 transition-opacity cursor-pointer'"
-              [title]="row.is_locked_out ? 'Unlock User' : 'Lock User'"
-            >
-              @if (row.is_locked_out) {
-                <lucide-icon name="lock" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
-              } @else {
-                <lucide-icon name="unlock" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
-              }
-            </button>
-            <button
-              type="button"
-              (click)="openCreateModal(row)"
-              class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
-              title="Edit User"
-            >
-              <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
-            </button>
+              <button
+                type="button"
+                (click)="openCreateModal(row)"
+                class="text-[var(--kkh-accent)] hover:opacity-80 transition-opacity cursor-pointer"
+                title="Edit User"
+              >
+                <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
+              </button>
             }
           </div>
         </ng-template>

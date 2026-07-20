@@ -160,32 +160,34 @@ export const UsersStore = signalStore(
       },
 
       async toggleLockout(userId: string) {
-        // Find current user state
         const user = store.users().find(u => u.id === userId);
         if (!user) return;
-        
+
         try {
-          const payload = {
+          await lastValueFrom(http.put(`/users/${userId}`, {
             is_locked_out: !user.is_locked_out
-          };
-          // Simulate toggle locally until endpoint is fully ready or just call put
-          await lastValueFrom(http.put(`/users/${userId}`, payload));
+          }));
           await loadUsers(true);
-        } catch (err) {
-           console.error('Error toggling lockout:', err);
-           // Fallback optimistic update
-           const updated = store.users().map(u => {
-              if (u.id === userId) {
-                const nextLockedState = !u.is_locked_out;
-                return {
-                  ...u,
-                  is_locked_out: nextLockedState,
-                  lockout_end: nextLockedState ? new Date(Date.now() + 30 * 60 * 1000) : null,
-                };
-              }
-              return u;
-           });
-           patchState(store, { users: updated });
+          toast.success(user.is_locked_out ? 'User unlocked' : 'User locked');
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to update account status');
+          console.error('Error toggling lockout:', err);
+        }
+      },
+
+      async toggleMfa(userId: string) {
+        const user = store.users().find(u => u.id === userId);
+        if (!user) return;
+
+        try {
+          await lastValueFrom(http.put(`/users/${userId}`, {
+            two_factor_enabled: !user.two_factor_enabled
+          }));
+          await loadUsers(true);
+          toast.success(user.two_factor_enabled ? 'MFA disabled' : 'MFA enabled');
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to update MFA');
+          console.error('Error toggling MFA:', err);
         }
       }
     };
