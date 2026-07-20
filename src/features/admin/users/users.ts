@@ -175,30 +175,50 @@ const passwordComplexityValidators = [
           </button>
         </ng-template>
 
-        <ng-template kkhCell="two_factor_enabled" let-row>
-          <button
-            type="button"
-            class="kkh-relation-summary"
-            [class.kkh-relation-summary--empty]="!row.two_factor_enabled"
-            [disabled]="!canEdit()"
-            (click)="canEdit() && usersStore.toggleMfa(row.id)"
-            [attr.aria-label]="row.two_factor_enabled ? 'Disable MFA' : 'Enable MFA'"
-            [title]="row.two_factor_enabled ? '2FA active — click to disable' : 'Disabled — click to enable'"
-          >
-            <span class="kkh-relation-summary__count">
-              <span class="kkh-relation-summary__label">
-                {{ row.two_factor_enabled ? '2FA Active' : 'Disabled' }}
-              </span>
-              @if (canEdit()) {
-                <span class="kkh-relation-summary__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 20h9" />
-                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-                  </svg>
+        <ng-template kkhCell="two_factor_required" let-row>
+          <div class="flex flex-col gap-1.5 min-w-[9rem]">
+            <button
+              type="button"
+              class="kkh-relation-summary"
+              [class.kkh-relation-summary--empty]="!row.two_factor_required"
+              [disabled]="!canEdit()"
+              (click)="canEdit() && usersStore.toggleMfaRequired(row.id)"
+              [attr.aria-label]="row.two_factor_required ? 'Clear MFA requirement' : 'Require MFA'"
+              [title]="row.two_factor_required ? 'MFA required — click to clear policy' : 'Not required — click to require MFA'"
+            >
+              <span class="kkh-relation-summary__count">
+                <span class="kkh-relation-summary__label">
+                  {{ row.two_factor_required ? 'Required' : 'Optional' }}
                 </span>
-              }
+                @if (canEdit()) {
+                  <span class="kkh-relation-summary__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </span>
+                }
+              </span>
+            </button>
+            <span
+              class="kkh-chip text-[10px] w-fit"
+              [class.kkh-chip-ok]="row.two_factor_enabled"
+              [class.kkh-chip-muted]="!row.two_factor_enabled"
+              [title]="row.two_factor_enabled ? 'User has enrolled an authenticator' : 'User has not enrolled MFA'"
+            >
+              {{ row.two_factor_enabled ? 'Enrolled' : 'Not enrolled' }}
             </span>
-          </button>
+            @if (canEdit() && row.two_factor_enabled) {
+              <button
+                type="button"
+                class="text-left text-[10px] font-mono uppercase tracking-wider text-[var(--kkh-danger)] hover:underline cursor-pointer"
+                (click)="usersStore.forceDisableMfa(row.id)"
+                title="Wipe authenticator and recovery codes"
+              >
+                Force disable
+              </button>
+            }
+          </div>
         </ng-template>
 
         <ng-template kkhCell="created_at" let-row>
@@ -321,10 +341,10 @@ const passwordComplexityValidators = [
             <label class="flex items-center cursor-pointer select-none">
               <input
                 type="checkbox"
-                formControlName="two_factor_enabled"
+                formControlName="two_factor_required"
                 class="h-4 w-4 rounded-sm border-[var(--kkh-border)] bg-[var(--kkh-panel)] text-[var(--kkh-accent)] cursor-pointer"
               />
-              <span class="ml-3 text-sm text-[var(--kkh-text)]">Force Multi-Factor Authentication (MFA)</span>
+              <span class="ml-3 text-sm text-[var(--kkh-text)]">Require Multi-Factor Authentication (MFA)</span>
             </label>
 
             <label class="flex items-center cursor-pointer select-none">
@@ -380,7 +400,7 @@ export class UsersComponent implements OnInit {
     { id: 'last_name', header: 'Last Name', sortable: true },
     { id: 'roles', header: 'Roles' },
     { id: 'is_locked_out', header: 'Account Status', sortable: true },
-    { id: 'two_factor_enabled', header: 'MFA', sortable: true },
+    { id: 'two_factor_required', header: 'MFA', sortable: true },
     { id: 'created_at', header: 'Created At', sortable: true },
     { id: 'actions', header: 'Actions', align: 'right' }
   ];
@@ -393,8 +413,8 @@ export class UsersComponent implements OnInit {
 
   protected readonly mfaOptions: SelectOption[] = [
     { value: 'all', label: 'All MFA States' },
-    { value: 'enabled', label: 'Enabled Only' },
-    { value: 'disabled', label: 'Disabled Only' }
+    { value: 'enabled', label: 'Enrolled Only' },
+    { value: 'disabled', label: 'Not Enrolled' }
   ];
 
   protected readonly activeUserId = signal<string | null>(null);
@@ -431,7 +451,7 @@ export class UsersComponent implements OnInit {
     password: new FormControl('', { nonNullable: true, validators: passwordComplexityValidators }),
     confirmPassword: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     lockout_enabled: new FormControl(true, { nonNullable: true }),
-    two_factor_enabled: new FormControl(false, { nonNullable: true }),
+    two_factor_required: new FormControl(false, { nonNullable: true }),
     first_time_login: new FormControl(true, { nonNullable: true })
   }, { validators: passwordMatchValidator });
 
@@ -507,7 +527,7 @@ export class UsersComponent implements OnInit {
         password: '',
         confirmPassword: '',
         lockout_enabled: user.lockout_enabled || true,
-        two_factor_enabled: user.two_factor_enabled,
+        two_factor_required: user.two_factor_required,
         first_time_login: user.first_time_login || true
       });
       this.userForm.get('password')?.setValidators([
@@ -525,7 +545,7 @@ export class UsersComponent implements OnInit {
         password: '',
         confirmPassword: '',
         lockout_enabled: true,
-        two_factor_enabled: false,
+        two_factor_required: false,
         first_time_login: true
       });
       this.userForm.get('password')?.setValidators(passwordComplexityValidators);
@@ -588,7 +608,7 @@ export class UsersComponent implements OnInit {
           display_name: formVal.display_name,
           email: formVal.email,
           lockout_enabled: formVal.lockout_enabled,
-          two_factor_enabled: formVal.two_factor_enabled,
+          two_factor_required: formVal.two_factor_required,
           first_time_login: formVal.first_time_login
         },
         newPassword || undefined
@@ -604,7 +624,7 @@ export class UsersComponent implements OnInit {
         email: formVal.email,
         password: formVal.password,
         lockoutEnabled: formVal.lockout_enabled,
-        twoFactorEnabled: formVal.two_factor_enabled,
+        twoFactorRequired: formVal.two_factor_required,
         firstTimeLogin: formVal.first_time_login
       });
       if (!ok) {

@@ -175,19 +175,35 @@ export const UsersStore = signalStore(
         }
       },
 
-      async toggleMfa(userId: string) {
+      async toggleMfaRequired(userId: string) {
         const user = store.users().find(u => u.id === userId);
         if (!user) return;
 
         try {
           await lastValueFrom(http.put(`/users/${userId}`, {
-            two_factor_enabled: !user.two_factor_enabled
+            two_factor_required: !user.two_factor_required
           }));
           await loadUsers(true);
-          toast.success(user.two_factor_enabled ? 'MFA disabled' : 'MFA enabled');
+          toast.success(user.two_factor_required ? 'MFA requirement cleared' : 'MFA now required');
         } catch (err: any) {
-          toast.error(err?.error?.detail || err?.message || 'Failed to update MFA');
-          console.error('Error toggling MFA:', err);
+          toast.error(err?.error?.detail || err?.message || 'Failed to update MFA requirement');
+          console.error('Error toggling MFA requirement:', err);
+        }
+      },
+
+      async forceDisableMfa(userId: string) {
+        const user = store.users().find(u => u.id === userId);
+        if (!user || !user.two_factor_enabled) return;
+
+        try {
+          await lastValueFrom(http.put(`/users/${userId}`, {
+            two_factor_enabled: false
+          }));
+          await loadUsers(true);
+          toast.success('MFA enrollment cleared');
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to disable MFA');
+          console.error('Error force-disabling MFA:', err);
         }
       },
 

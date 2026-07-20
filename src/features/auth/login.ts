@@ -3,7 +3,12 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { RouterLink } from '@angular/router';
 import { AuthStore, AuthStoreType } from '../../core/stores/auth-store';
 import { ThemeStore } from '../../core/stores/theme-store';
-import { KkhAlertComponent, KkhButtonComponent, KkhInputComponent } from '../../shared/ui';
+import {
+  KkhAlertComponent,
+  KkhButtonComponent,
+  KkhInputComponent,
+  KkhProgressComponent
+} from '../../shared/ui';
 
 @Component({
   selector: 'app-login',
@@ -12,7 +17,8 @@ import { KkhAlertComponent, KkhButtonComponent, KkhInputComponent } from '../../
     RouterLink,
     KkhAlertComponent,
     KkhButtonComponent,
-    KkhInputComponent
+    KkhInputComponent,
+    KkhProgressComponent
   ],
   template: `
     <div class="relative min-h-screen cyber-grid flex flex-col">
@@ -33,56 +39,96 @@ import { KkhAlertComponent, KkhButtonComponent, KkhInputComponent } from '../../
           <div class="text-center mb-8">
             <p class="kkh-label text-[var(--kkh-accent)]">Identity Console</p>
             <h1 class="kkh-title mt-3 text-4xl sm:text-5xl text-[var(--kkh-text)] tracking-[0.18em]">KKH</h1>
-            <p class="mt-3 font-mono text-xs tracking-[0.14em] uppercase text-[var(--kkh-muted)]">Secure access required</p>
+            <p class="mt-3 font-mono text-xs tracking-[0.14em] uppercase text-[var(--kkh-muted)]">
+              {{ mfaStep() ? 'Second factor required' : 'Secure access required' }}
+            </p>
           </div>
 
           <div class="kkh-panel kkh-panel--framed relative overflow-hidden">
             <div class="kkh-rail"></div>
-            <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="flex flex-col gap-5 px-6 py-7 sm:px-8 sm:py-8">
-              @if (errorMessage(); as err) {
-                <kkh-alert tone="danger">{{ err }}</kkh-alert>
-              }
 
-              @if (isLoading()) {
-                <div class="kkh-auth-status" role="status" aria-live="polite">
-                  <span class="kkh-spinner-cyber text-[var(--kkh-accent)]" aria-hidden="true"></span>
-                  <span class="kkh-auth-status__code">AUTH // VERIFY</span>
-                  <span class="kkh-auth-status__msg">Establishing secure session…</span>
+            @if (!mfaStep()) {
+              <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="flex flex-col gap-5 px-6 py-7 sm:px-8 sm:py-8">
+                @if (errorMessage(); as err) {
+                  <kkh-alert tone="danger">{{ err }}</kkh-alert>
+                }
+
+                @if (isLoading()) {
+                  <div class="kkh-auth-status" role="status" aria-live="polite">
+                    <span class="kkh-spinner-cyber text-[var(--kkh-accent)]" aria-hidden="true"></span>
+                    <span class="kkh-auth-status__code">AUTH // VERIFY</span>
+                    <span class="kkh-auth-status__msg">Establishing secure session…</span>
+                  </div>
+                }
+
+                <kkh-input
+                  label="Email"
+                  icon="mail"
+                  type="email"
+                  autocomplete="username"
+                  placeholder="name@company.com"
+                  formControlName="email"
+                  [error]="loginForm.controls.email.touched && loginForm.controls.email.invalid ? 'Enter a valid email' : null"
+                />
+
+                <kkh-input
+                  label="Password"
+                  icon="lock"
+                  type="password"
+                  autocomplete="current-password"
+                  placeholder="••••••••"
+                  formControlName="password"
+                  [error]="loginForm.controls.password.touched && loginForm.controls.password.invalid ? 'Password is required' : null"
+                />
+
+                <div class="pt-1">
+                  <kkh-button variant="primary" type="submit" [fullWidth]="true" [loading]="isLoading()" [disabled]="isLoading()">
+                    {{ isLoading() ? 'Authenticating…' : 'Authenticate' }}
+                  </kkh-button>
                 </div>
-              }
+              </form>
+            } @else {
+              <form [formGroup]="mfaForm" (ngSubmit)="onMfaSubmit()" class="flex flex-col gap-5 px-6 py-7 sm:px-8 sm:py-8">
+                @if (errorMessage(); as err) {
+                  <kkh-alert tone="danger">{{ err }}</kkh-alert>
+                }
 
-              <kkh-input
-                label="Email"
-                icon="mail"
-                type="email"
-                autocomplete="username"
-                placeholder="name@company.com"
-                formControlName="email"
-                [error]="loginForm.controls.email.touched && loginForm.controls.email.invalid ? 'Enter a valid email' : null"
-              />
+                <p class="text-sm text-[var(--kkh-muted)]">
+                  Enter the 6-digit code from your authenticator app, or a one-time recovery code.
+                </p>
 
-              <kkh-input
-                label="Password"
-                icon="lock"
-                type="password"
-                autocomplete="current-password"
-                placeholder="••••••••"
-                formControlName="password"
-                [error]="loginForm.controls.password.touched && loginForm.controls.password.invalid ? 'Password is required' : null"
-              />
+                @if (isLoading()) {
+                  <kkh-progress [indeterminate]="true" label="Verifying second factor" />
+                }
 
-              <div class="pt-1">
-                <kkh-button variant="primary" type="submit" [fullWidth]="true" [loading]="isLoading()" [disabled]="isLoading()">
-                  {{ isLoading() ? 'Authenticating…' : 'Authenticate' }}
-                </kkh-button>
-              </div>
-            </form>
+                <kkh-input
+                  label="Authentication code"
+                  icon="lock"
+                  type="text"
+                  autocomplete="one-time-code"
+                  placeholder="123456"
+                  formControlName="code"
+                  [error]="mfaForm.controls.code.touched && mfaForm.controls.code.invalid ? 'Enter a valid code' : null"
+                />
+
+                <div class="flex flex-col gap-3 pt-1">
+                  <kkh-button variant="primary" type="submit" [fullWidth]="true" [loading]="isLoading()" [disabled]="isLoading()">
+                    {{ isLoading() ? 'Verifying…' : 'Verify' }}
+                  </kkh-button>
+                  <kkh-button variant="ghost" type="button" [fullWidth]="true" [disabled]="isLoading()" (pressed)="onCancelMfa()">
+                    Back to sign in
+                  </kkh-button>
+                </div>
+              </form>
+            }
           </div>
 
-          <p class="mt-6 text-center text-sm text-[var(--kkh-muted)]">
-            Need an account?
-            <a routerLink="/register" class="text-[var(--kkh-accent)] font-medium hover:underline ml-1">Register</a>
-          </p>
+          @if (!mfaStep()) {
+            <p class="mt-6 text-center text-sm text-[var(--kkh-muted)]">
+              Need an account?
+              <a routerLink="/register" class="text-[var(--kkh-accent)] font-medium hover:underline ml-1">Register</a>
+            </p>
+          }
         </div>
       </main>
     </div>
@@ -94,6 +140,7 @@ export class LoginComponent {
 
   protected readonly isLoading = computed(() => this.authStore.isLoading());
   protected readonly errorMessage = computed(() => this.authStore.error());
+  protected readonly mfaStep = computed(() => this.authStore.isMfaPending());
 
   protected readonly loginForm = new FormGroup({
     email: new FormControl('', {
@@ -103,6 +150,13 @@ export class LoginComponent {
     password: new FormControl('', {
       nonNullable: true,
       validators: [Validators.required]
+    })
+  });
+
+  protected readonly mfaForm = new FormGroup({
+    code: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.minLength(6)]
     })
   });
 
@@ -122,5 +176,24 @@ export class LoginComponent {
     } catch {
       // Error message is set on AuthStore.
     }
+  }
+
+  protected async onMfaSubmit(): Promise<void> {
+    if (this.mfaForm.invalid) {
+      this.mfaForm.markAllAsTouched();
+      return;
+    }
+
+    this.authStore.setError(null);
+    try {
+      await this.authStore.completeMfaLogin(this.mfaForm.controls.code.value);
+    } catch {
+      // Error message is set on AuthStore.
+    }
+  }
+
+  protected onCancelMfa(): void {
+    this.mfaForm.reset();
+    this.authStore.cancelMfaChallenge();
   }
 }

@@ -18,7 +18,7 @@ import {
 import { AuthStore, AuthStoreType } from '../stores/auth-store';
 import { Router } from '@angular/router';
 
-const AUTH_SKIP_BEARER = ['/users/login', '/users/register', '/users/logout', '/refresh-token'];
+const AUTH_SKIP_BEARER = ['/users/login', '/users/register', '/users/logout', '/refresh-token', '/users/login/mfa'];
 
 let isRefreshing = false;
 /** Emits new access token on success, or '' on failure so waiters unblock. */

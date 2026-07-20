@@ -1,17 +1,17 @@
 import { Component, inject } from '@angular/core';
 import { ThemeStore } from '../../../core/stores/theme-store';
-import { KkhPageHeaderComponent, KkhButtonComponent, KkhAlertComponent } from '../../../shared/ui';
+import { KkhPageHeaderComponent, KkhButtonComponent } from '../../../shared/ui';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [KkhPageHeaderComponent, KkhButtonComponent, KkhAlertComponent],
+  imports: [KkhPageHeaderComponent, KkhButtonComponent],
   template: `
     <div class="space-y-8 max-w-3xl kkh-page-enter">
       <kkh-page-header
         eyebrow="Preferences"
         title="Settings"
-        description="Console appearance. MFA endpoints are not available on this API build."
+        description="Console appearance and display preferences."
       />
 
       <div class="kkh-panel p-6 relative">
@@ -25,11 +25,6 @@ import { KkhPageHeaderComponent, KkhButtonComponent, KkhAlertComponent } from '.
           <kkh-button variant="secondary" (pressed)="themeStore.toggleTheme()">Toggle theme</kkh-button>
         </div>
       </div>
-
-      <kkh-alert tone="info" title="Security note">
-        Two-factor authentication UI was removed because Dotnet-NTier does not expose MFA APIs yet.
-        Use strong passwords and role-scoped permissions instead.
-      </kkh-alert>
     </div>
   `
 })

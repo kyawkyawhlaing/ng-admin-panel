@@ -44,6 +44,7 @@ export interface UsersTable {
   last_name: string;
   first_time_login: boolean;
   two_factor_enabled: boolean;
+  two_factor_required: boolean;
   access_failed_count: number;
   lockout_enabled: boolean;
   is_locked_out: boolean;

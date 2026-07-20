@@ -11,14 +11,36 @@ function waitForSessionReady(authStore: AuthStoreType) {
   );
 }
 
+function hasAdminAccess(authStore: AuthStoreType): boolean {
+  return authStore.isAuthenticated() || authStore.isMfaEnrollPending();
+}
+
 export const authGuard: CanActivateFn = () => {
   const authStore = inject(AuthStore) as unknown as AuthStoreType;
   const router = inject(Router);
 
   return waitForSessionReady(authStore).pipe(
     map((): boolean | UrlTree =>
-      authStore.isAuthenticated() ? true : router.createUrlTree(['/login'])
+      hasAdminAccess(authStore) ? true : router.createUrlTree(['/login'])
     )
+  );
+};
+
+/** Blocks non-profile admin routes while MFA enrollment is required. */
+export const mfaEnrollGateGuard: CanActivateFn = () => {
+  const authStore = inject(AuthStore) as unknown as AuthStoreType;
+  const router = inject(Router);
+
+  return waitForSessionReady(authStore).pipe(
+    map((): boolean | UrlTree => {
+      if (authStore.isMfaEnrollPending()) {
+        return router.createUrlTree(['/admin/profile']);
+      }
+      if (!authStore.isAuthenticated()) {
+        return router.createUrlTree(['/login']);
+      }
+      return true;
+    })
   );
 };
 
@@ -27,9 +49,15 @@ export const redirectIfLoggedInGuard: CanActivateFn = () => {
   const router = inject(Router);
 
   return waitForSessionReady(authStore).pipe(
-    map((): boolean | UrlTree =>
-      authStore.isAuthenticated() ? router.createUrlTree(['/admin']) : true
-    )
+    map((): boolean | UrlTree => {
+      if (authStore.isMfaPending()) {
+        return true;
+      }
+      if (authStore.isMfaEnrollPending()) {
+        return router.createUrlTree(['/admin/profile']);
+      }
+      return authStore.isAuthenticated() ? router.createUrlTree(['/admin']) : true;
+    })
   );
 };
 
@@ -41,6 +69,9 @@ export const permissionGuard: CanActivateFn = (route) => {
 
   return waitForSessionReady(authStore).pipe(
     map((): boolean | UrlTree => {
+      if (authStore.isMfaEnrollPending()) {
+        return router.createUrlTree(['/admin/profile']);
+      }
       if (!authStore.isAuthenticated()) {
         return router.createUrlTree(['/login']);
       }

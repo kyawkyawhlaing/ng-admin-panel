@@ -1,5 +1,10 @@
 import { Routes } from '@angular/router';
-import { authGuard, redirectIfLoggedInGuard, permissionGuard } from '../core/guards/auth.guard';
+import {
+  authGuard,
+  redirectIfLoggedInGuard,
+  permissionGuard,
+  mfaEnrollGateGuard
+} from '../core/guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -29,6 +34,7 @@ export const routes: Routes = [
       },
       {
         path: 'dashboard',
+        canActivate: [mfaEnrollGateGuard],
         loadComponent: () => import('../features/admin/dashboard/dashboard').then(m => m.DashboardComponent)
       },
       {
@@ -61,6 +67,7 @@ export const routes: Routes = [
       },
       {
         path: 'settings',
+        canActivate: [mfaEnrollGateGuard],
         loadComponent: () => import('../features/admin/settings/settings').then(m => m.SettingsComponent)
       }
     ]

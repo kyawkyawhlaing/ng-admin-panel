@@ -19,12 +19,19 @@ export interface AuthUser {
   name: string;
 }
 
-export type SessionStatus = 'bootstrapping' | 'authenticated' | 'anonymous';
+export type SessionStatus =
+  | 'bootstrapping'
+  | 'authenticated'
+  | 'anonymous'
+  | 'mfa_pending'
+  | 'mfa_enroll_pending';
 
 export interface AuthState {
   user: AuthUser | null;
-  /** Access JWT — memory only; never written to storage. */
+  /** Access JWT or enroll-only pending JWT — memory only; never written to storage. */
   token: string | null;
+  /** Short-lived MFA challenge token (login step 2). */
+  mfaToken: string | null;
   tokenExpiresAtMs: number | null;
   roles: string[];
   permissions: string[];
@@ -36,6 +43,7 @@ export interface AuthState {
 const initialState: AuthState = {
   user: null,
   token: null,
+  mfaToken: null,
   tokenExpiresAtMs: null,
   roles: [],
   permissions: [],
@@ -46,6 +54,13 @@ const initialState: AuthState = {
 
 interface AccessTokenResponse {
   accessToken: string;
+}
+
+interface LoginResponse {
+  status: 'authenticated' | 'mfa_required' | 'mfa_enrollment_required';
+  accessToken?: string | null;
+  mfaToken?: string | null;
+  enrollToken?: string | null;
 }
 
 /** Legacy keys from earlier builds that persisted JWT in browser storage. */
@@ -85,6 +100,8 @@ export const AuthStore = signalStore(
       }
       return !isAccessTokenExpired(token);
     }),
+    isMfaPending: computed(() => store.sessionStatus() === 'mfa_pending'),
+    isMfaEnrollPending: computed(() => store.sessionStatus() === 'mfa_enroll_pending'),
     displayName: computed(() => store.user()?.name || 'User'),
     displayEmail: computed(() => store.user()?.email || '')
   })),
@@ -103,6 +120,7 @@ export const AuthStore = signalStore(
       purgeLegacyAuthStorage();
       patchState(store, {
         token: accessToken,
+        mfaToken: null,
         tokenExpiresAtMs: parsed.expiresAtMs,
         user: {
           id: parsed.userId,
@@ -117,11 +135,36 @@ export const AuthStore = signalStore(
       return true;
     };
 
+    const applyEnrollToken = (enrollToken: string): boolean => {
+      const parsed = parseAccessToken(enrollToken);
+      if (!parsed || !parsed.userId) {
+        return false;
+      }
+
+      purgeLegacyAuthStorage();
+      patchState(store, {
+        token: enrollToken,
+        mfaToken: null,
+        tokenExpiresAtMs: parsed.expiresAtMs,
+        user: {
+          id: parsed.userId,
+          email: parsed.email,
+          name: parsed.name
+        },
+        roles: [],
+        permissions: [],
+        sessionStatus: 'mfa_enroll_pending',
+        error: null
+      });
+      return true;
+    };
+
     const clearSession = (): void => {
       purgeLegacyAuthStorage();
       patchState(store, {
         user: null,
         token: null,
+        mfaToken: null,
         tokenExpiresAtMs: null,
         roles: [],
         permissions: [],
@@ -169,13 +212,90 @@ export const AuthStore = signalStore(
         return permissions.some((p) => granted.includes(p));
       },
 
-      async login(email: string, password: string): Promise<void> {
+      async login(email: string, password: string): Promise<'authenticated' | 'mfa_required' | 'mfa_enrollment_required'> {
+        patchState(store, { isLoading: true, error: null, mfaToken: null });
+        try {
+          const response = await firstValueFrom(
+            http.post<LoginResponse>(
+              '/users/login',
+              { email: email.trim(), password },
+              { withCredentials: true }
+            )
+          );
+
+          if (response.status === 'mfa_required' && response.mfaToken) {
+            patchState(store, {
+              isLoading: false,
+              sessionStatus: 'mfa_pending',
+              mfaToken: response.mfaToken,
+              token: null,
+              user: null,
+              roles: [],
+              permissions: [],
+              error: null
+            });
+            return 'mfa_required';
+          }
+
+          if (response.status === 'mfa_enrollment_required' && response.enrollToken) {
+            if (!applyEnrollToken(response.enrollToken)) {
+              clearSession();
+              patchState(store, {
+                isLoading: false,
+                error: 'Invalid enrollment token.'
+              });
+              throw new Error('Invalid enrollment token.');
+            }
+            patchState(store, { isLoading: false });
+            await router.navigateByUrl('/admin/profile');
+            return 'mfa_enrollment_required';
+          }
+
+          if (response.status === 'authenticated' && response.accessToken) {
+            if (!applyAccessToken(response.accessToken)) {
+              clearSession();
+              patchState(store, {
+                isLoading: false,
+                error: 'Invalid authentication token.'
+              });
+              throw new Error('Invalid authentication token.');
+            }
+            patchState(store, { isLoading: false });
+            await router.navigateByUrl('/admin/dashboard');
+            return 'authenticated';
+          }
+
+          clearSession();
+          patchState(store, {
+            isLoading: false,
+            error: 'Unexpected login response.',
+            sessionStatus: 'anonymous'
+          });
+          throw new Error('Unexpected login response.');
+        } catch (err) {
+          if (store.sessionStatus() === 'mfa_pending' || store.sessionStatus() === 'mfa_enroll_pending') {
+            throw err;
+          }
+          clearSession();
+          const message = authErrorMessage(err, 'Invalid email or password.');
+          patchState(store, { isLoading: false, error: message, sessionStatus: 'anonymous' });
+          throw err;
+        }
+      },
+
+      async completeMfaLogin(code: string): Promise<void> {
+        const mfaToken = store.mfaToken();
+        if (!mfaToken) {
+          patchState(store, { error: 'MFA session expired. Sign in again.', sessionStatus: 'anonymous' });
+          throw new Error('MFA session expired.');
+        }
+
         patchState(store, { isLoading: true, error: null });
         try {
           const response = await firstValueFrom(
             http.post<AccessTokenResponse>(
-              '/users/login',
-              { email: email.trim(), password },
+              '/users/login/mfa',
+              { mfaToken, code: code.trim() },
               { withCredentials: true }
             )
           );
@@ -192,11 +312,14 @@ export const AuthStore = signalStore(
           patchState(store, { isLoading: false });
           await router.navigateByUrl('/admin/dashboard');
         } catch (err) {
-          clearSession();
-          const message = authErrorMessage(err, 'Invalid email or password.');
-          patchState(store, { isLoading: false, error: message, sessionStatus: 'anonymous' });
+          const message = authErrorMessage(err, 'Invalid authentication code.');
+          patchState(store, { isLoading: false, error: message });
           throw err;
         }
+      },
+
+      cancelMfaChallenge(): void {
+        clearSession();
       },
 
       async logout(): Promise<void> {
@@ -218,6 +341,10 @@ export const AuthStore = signalStore(
        * Returns the new token, or null if the session cannot be restored.
        */
       async refreshSession(): Promise<string | null> {
+        if (store.sessionStatus() === 'mfa_pending' || store.sessionStatus() === 'mfa_enroll_pending') {
+          return null;
+        }
+
         try {
           const response = await firstValueFrom(
             http.post<AccessTokenResponse>('/refresh-token', null, { withCredentials: true })
@@ -290,6 +417,7 @@ export const AuthStore = signalStore(
 export interface AuthStoreType {
   readonly user: Signal<AuthUser | null>;
   readonly token: Signal<string | null>;
+  readonly mfaToken: Signal<string | null>;
   readonly tokenExpiresAtMs: Signal<number | null>;
   readonly roles: Signal<string[]>;
   readonly permissions: Signal<string[]>;
@@ -297,6 +425,8 @@ export interface AuthStoreType {
   readonly isLoading: Signal<boolean>;
   readonly error: Signal<string | null>;
   readonly isAuthenticated: Signal<boolean>;
+  readonly isMfaPending: Signal<boolean>;
+  readonly isMfaEnrollPending: Signal<boolean>;
   readonly displayName: Signal<string>;
   readonly displayEmail: Signal<string>;
   applyAccessToken(accessToken: string): boolean;
@@ -307,7 +437,9 @@ export interface AuthStoreType {
   hasRole(role: string): boolean;
   hasPermission(permission: string): boolean;
   hasAnyPermission(...permissions: string[]): boolean;
-  login(email: string, password: string): Promise<void>;
+  login(email: string, password: string): Promise<'authenticated' | 'mfa_required' | 'mfa_enrollment_required'>;
+  completeMfaLogin(code: string): Promise<void>;
+  cancelMfaChallenge(): void;
   logout(): Promise<void>;
   refreshSession(): Promise<string | null>;
   bootstrapSession(): Promise<void>;
