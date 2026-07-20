@@ -13,3 +13,4 @@ export * from './kkh-transfer';
 export * from './kkh-data-table';
 export * from './toast.service';
 export * from './kkh-toast-host';
+export * from './kkh-progress';

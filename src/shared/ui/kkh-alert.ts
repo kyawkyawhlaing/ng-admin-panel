@@ -2,28 +2,39 @@ import { Component, input, output } from '@angular/core';
 
 export type KkhAlertTone = 'success' | 'danger' | 'info' | 'warning';
 
+const DEFAULT_CODES: Record<KkhAlertTone, string> = {
+  success: 'SEC // OK',
+  danger: 'SEC // ALERT',
+  warning: 'SEC // WARN',
+  info: 'SEC // INFO'
+};
+
 @Component({
   selector: 'kkh-alert',
   standalone: true,
   template: `
     <div
-      class="flex items-start justify-between gap-3 border p-3.5 text-sm"
-      [style.border-radius]="'var(--kkh-radius)'"
+      class="kkh-alert"
       [class]="toneClass()"
+      [class.kkh-alert--scan]="scan()"
       role="alert"
     >
-      <div class="min-w-0 flex-1">
-        @if (title()) {
-          <p class="font-semibold mb-0.5">{{ title() }}</p>
-        }
-        <div class="text-[0.875rem] leading-relaxed">
+      <div class="kkh-alert__corners" aria-hidden="true"></div>
+      <div class="kkh-alert__content">
+        <div class="kkh-alert__head">
+          <span class="kkh-alert__code">{{ resolvedCode() }}</span>
+          @if (title()) {
+            <span class="kkh-alert__title">{{ title() }}</span>
+          }
+        </div>
+        <div class="kkh-alert__body">
           <ng-content />
         </div>
       </div>
       @if (dismissible()) {
         <button
           type="button"
-          class="shrink-0 opacity-70 hover:opacity-100 cursor-pointer text-lg leading-none"
+          class="kkh-alert__close"
           (click)="dismissed.emit()"
           aria-label="Dismiss"
         >✕</button>
@@ -34,16 +45,18 @@ export type KkhAlertTone = 'success' | 'danger' | 'info' | 'warning';
 export class KkhAlertComponent {
   readonly tone = input<KkhAlertTone>('info');
   readonly title = input<string | null>(null);
+  /** Override HUD code; defaults by tone (SEC // OK, …). */
+  readonly code = input<string | null>(null);
   readonly dismissible = input(false);
+  /** Soft scanline wash (cyber HUD). */
+  readonly scan = input(true);
   readonly dismissed = output<void>();
 
+  protected resolvedCode(): string {
+    return this.code()?.trim() || DEFAULT_CODES[this.tone()];
+  }
+
   protected toneClass(): string {
-    const map: Record<KkhAlertTone, string> = {
-      success: 'border-[var(--kkh-ok)] bg-[color-mix(in_srgb,var(--kkh-ok)_8%,transparent)] text-[var(--kkh-ok)]',
-      danger: 'border-[var(--kkh-danger)] bg-[color-mix(in_srgb,var(--kkh-danger)_8%,transparent)] text-[var(--kkh-danger)]',
-      info: 'border-[var(--kkh-info)] bg-[color-mix(in_srgb,var(--kkh-info)_8%,transparent)] text-[var(--kkh-info)]',
-      warning: 'border-[var(--kkh-warning)] bg-[color-mix(in_srgb,var(--kkh-warning)_8%,transparent)] text-[var(--kkh-warning)]'
-    };
-    return map[this.tone()];
+    return `kkh-alert--${this.tone()}`;
   }
 }

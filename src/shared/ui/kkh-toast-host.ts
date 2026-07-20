@@ -5,22 +5,31 @@ import { ToastService, ToastTone } from './toast.service';
   selector: 'kkh-toast-host',
   standalone: true,
   template: `
-    <div class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 w-[min(100%-2rem,22rem)] pointer-events-none">
+    <div class="kkh-toast-stack" aria-live="polite" aria-relevant="additions">
       @for (toast of toastService.toasts(); track toast.id) {
-        <div
-          class="pointer-events-auto flex items-start justify-between gap-3 border px-3.5 py-3 text-sm shadow-sm"
-          style="border-radius: var(--kkh-radius); background: var(--kkh-panel);"
+        <article
+          class="kkh-toast"
           [class]="toneClass(toast.tone)"
           role="status"
+          [style.--kkh-toast-ttl]="toast.duration > 0 ? toast.duration + 'ms' : '0ms'"
         >
-          <p class="min-w-0 flex-1 leading-snug">{{ toast.text }}</p>
-          <button
-            type="button"
-            class="shrink-0 opacity-70 hover:opacity-100 cursor-pointer leading-none"
-            (click)="toastService.dismiss(toast.id)"
-            aria-label="Dismiss"
-          >✕</button>
-        </div>
+          <div class="kkh-toast__corners" aria-hidden="true"></div>
+          <header class="kkh-toast__head">
+            <span class="kkh-toast__code">{{ toast.code }}</span>
+            <button
+              type="button"
+              class="kkh-toast__close"
+              (click)="toastService.dismiss(toast.id)"
+              aria-label="Dismiss"
+            >✕</button>
+          </header>
+          <p class="kkh-toast__body">{{ toast.text }}</p>
+          @if (toast.duration > 0) {
+            <div class="kkh-toast__ttl" aria-hidden="true">
+              <span class="kkh-toast__ttl-fill"></span>
+            </div>
+          }
+        </article>
       }
     </div>
   `
@@ -29,12 +38,6 @@ export class KkhToastHostComponent {
   protected readonly toastService = inject(ToastService);
 
   protected toneClass(tone: ToastTone): string {
-    const map: Record<ToastTone, string> = {
-      success: 'border-[var(--kkh-ok)] text-[var(--kkh-ok)]',
-      danger: 'border-[var(--kkh-danger)] text-[var(--kkh-danger)]',
-      info: 'border-[var(--kkh-info)] text-[var(--kkh-info)]',
-      warning: 'border-[var(--kkh-warning)] text-[var(--kkh-warning)]'
-    };
-    return map[tone];
+    return `kkh-toast--${tone}`;
   }
 }

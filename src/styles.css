@@ -112,6 +112,7 @@ kkh-textarea,
 kkh-combo-box,
 kkh-lookup,
 kkh-alert,
+kkh-progress,
 kkh-page-header,
 kkh-data-table,
 kkh-transfer {
@@ -827,6 +828,461 @@ kkh-button.kkh-host-full .kkh-btn {
   .kkh-page-enter {
     animation: none !important;
   }
+
+  .kkh-alert--scan::after,
+  .kkh-toast__ttl-fill,
+  .kkh-progress--indeterminate .kkh-progress__fill {
+    animation: none !important;
+  }
+
+  .kkh-toast__ttl-fill {
+    width: 0 !important;
+  }
+}
+
+/* ——— Cyber alert / toast / progress kit ——— */
+.kkh-alert {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--kkh-border);
+  border-radius: var(--kkh-radius);
+  background: var(--kkh-raised);
+  overflow: hidden;
+  color: var(--kkh-text);
+}
+
+.kkh-alert__corners::before,
+.kkh-alert__corners::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-style: solid;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.kkh-alert__corners::before {
+  top: 5px;
+  left: 5px;
+  border-width: 1.5px 0 0 1.5px;
+}
+
+.kkh-alert__corners::after {
+  top: 5px;
+  right: 5px;
+  border-width: 1.5px 1.5px 0 0;
+}
+
+.kkh-alert__content {
+  min-width: 0;
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.kkh-alert__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+.kkh-alert__code {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--kkh-accent);
+}
+
+.kkh-alert__title {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--kkh-text);
+}
+
+.kkh-alert__body {
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  color: var(--kkh-muted);
+}
+
+.kkh-alert__close {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  margin: -0.15rem -0.1rem 0 0;
+  padding: 0.15rem 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--kkh-muted);
+  cursor: pointer;
+  font-size: 0.875rem;
+  line-height: 1;
+}
+
+.kkh-alert__close:hover {
+  color: var(--kkh-text);
+}
+
+.kkh-alert--scan::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kkh-accent) 10%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+  animation: kkh-auth-scan 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.kkh-alert--success {
+  border-color: color-mix(in srgb, var(--kkh-ok) 45%, var(--kkh-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--kkh-ok) 12%, transparent), transparent 55%),
+    var(--kkh-raised);
+}
+.kkh-alert--success .kkh-alert__code,
+.kkh-alert--success .kkh-alert__corners::before,
+.kkh-alert--success .kkh-alert__corners::after {
+  color: var(--kkh-ok);
+  border-color: var(--kkh-ok);
+}
+.kkh-alert--success.kkh-alert--scan::after {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kkh-ok) 10%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+}
+
+.kkh-alert--danger {
+  border-color: color-mix(in srgb, var(--kkh-danger) 45%, var(--kkh-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--kkh-danger) 12%, transparent), transparent 55%),
+    var(--kkh-raised);
+}
+.kkh-alert--danger .kkh-alert__code,
+.kkh-alert--danger .kkh-alert__corners::before,
+.kkh-alert--danger .kkh-alert__corners::after {
+  color: var(--kkh-danger);
+  border-color: var(--kkh-danger);
+}
+.kkh-alert--danger.kkh-alert--scan::after {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kkh-danger) 10%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+}
+
+.kkh-alert--warning {
+  border-color: color-mix(in srgb, var(--kkh-warning) 45%, var(--kkh-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--kkh-warning) 12%, transparent), transparent 55%),
+    var(--kkh-raised);
+}
+.kkh-alert--warning .kkh-alert__code,
+.kkh-alert--warning .kkh-alert__corners::before,
+.kkh-alert--warning .kkh-alert__corners::after {
+  color: var(--kkh-warning);
+  border-color: var(--kkh-warning);
+}
+.kkh-alert--warning.kkh-alert--scan::after {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kkh-warning) 10%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+}
+
+.kkh-alert--info {
+  border-color: color-mix(in srgb, var(--kkh-info) 45%, var(--kkh-border));
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--kkh-info) 12%, transparent), transparent 55%),
+    var(--kkh-raised);
+}
+.kkh-alert--info .kkh-alert__code,
+.kkh-alert--info .kkh-alert__corners::before,
+.kkh-alert--info .kkh-alert__corners::after {
+  color: var(--kkh-info);
+  border-color: var(--kkh-info);
+}
+.kkh-alert--info.kkh-alert--scan::after {
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kkh-info) 10%, transparent) 50%,
+    transparent 100%
+  );
+  background-size: 100% 220%;
+}
+
+.kkh-toast-stack {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: min(calc(100% - 2rem), 22rem);
+  pointer-events: none;
+}
+
+.kkh-toast {
+  position: relative;
+  pointer-events: auto;
+  overflow: hidden;
+  border: 1px solid var(--kkh-border);
+  border-radius: var(--kkh-radius);
+  background: var(--kkh-panel);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--kkh-bg) 45%, transparent);
+  animation: kkh-fade-up 0.22s ease both;
+}
+
+.kkh-toast__corners::before,
+.kkh-toast__corners::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-style: solid;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.kkh-toast__corners::before {
+  top: 5px;
+  left: 5px;
+  border-width: 1.5px 0 0 1.5px;
+}
+
+.kkh-toast__corners::after {
+  bottom: 5px;
+  right: 5px;
+  border-width: 0 1.5px 1.5px 0;
+}
+
+.kkh-toast__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem 0.2rem;
+}
+
+.kkh-toast__code {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--kkh-accent);
+}
+
+.kkh-toast__close {
+  border: 0;
+  background: transparent;
+  color: var(--kkh-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.1rem 0.2rem;
+}
+
+.kkh-toast__close:hover {
+  color: var(--kkh-text);
+}
+
+.kkh-toast__body {
+  margin: 0;
+  padding: 0 0.75rem 0.7rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: var(--kkh-text);
+}
+
+.kkh-toast__ttl {
+  height: 2px;
+  background: color-mix(in srgb, var(--kkh-border) 80%, transparent);
+}
+
+.kkh-toast__ttl-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  background: currentColor;
+  animation: kkh-toast-ttl var(--kkh-toast-ttl, 4s) linear forwards;
+}
+
+@keyframes kkh-toast-ttl {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.kkh-toast--success {
+  border-color: color-mix(in srgb, var(--kkh-ok) 45%, var(--kkh-border));
+  color: var(--kkh-ok);
+}
+.kkh-toast--success .kkh-toast__code,
+.kkh-toast--success .kkh-toast__corners::before,
+.kkh-toast--success .kkh-toast__corners::after {
+  color: var(--kkh-ok);
+  border-color: var(--kkh-ok);
+}
+
+.kkh-toast--danger {
+  border-color: color-mix(in srgb, var(--kkh-danger) 45%, var(--kkh-border));
+  color: var(--kkh-danger);
+}
+.kkh-toast--danger .kkh-toast__code,
+.kkh-toast--danger .kkh-toast__corners::before,
+.kkh-toast--danger .kkh-toast__corners::after {
+  color: var(--kkh-danger);
+  border-color: var(--kkh-danger);
+}
+
+.kkh-toast--warning {
+  border-color: color-mix(in srgb, var(--kkh-warning) 45%, var(--kkh-border));
+  color: var(--kkh-warning);
+}
+.kkh-toast--warning .kkh-toast__code,
+.kkh-toast--warning .kkh-toast__corners::before,
+.kkh-toast--warning .kkh-toast__corners::after {
+  color: var(--kkh-warning);
+  border-color: var(--kkh-warning);
+}
+
+.kkh-toast--info {
+  border-color: color-mix(in srgb, var(--kkh-info) 45%, var(--kkh-border));
+  color: var(--kkh-info);
+}
+.kkh-toast--info .kkh-toast__code,
+.kkh-toast--info .kkh-toast__corners::before,
+.kkh-toast--info .kkh-toast__corners::after {
+  color: var(--kkh-info);
+  border-color: var(--kkh-info);
+}
+
+.kkh-progress-host {
+  display: block;
+  width: 100%;
+}
+
+.kkh-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.kkh-progress__meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.kkh-progress__label,
+.kkh-progress__value {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--kkh-muted);
+}
+
+.kkh-progress__value {
+  color: var(--kkh-accent);
+}
+
+.kkh-progress__track {
+  position: relative;
+  height: 6px;
+  border: 1px solid var(--kkh-border);
+  border-radius: var(--kkh-radius);
+  background: var(--kkh-raised);
+  overflow: hidden;
+}
+
+.kkh-progress__fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--kkh-accent) 55%, transparent),
+    var(--kkh-accent)
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--kkh-accent) 35%, transparent);
+  transition: width 0.2s ease;
+}
+
+.kkh-progress--indeterminate .kkh-progress__fill {
+  width: 35%;
+  animation: kkh-progress-scan 1.25s ease-in-out infinite;
+}
+
+@keyframes kkh-progress-scan {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.kkh-progress--success .kkh-progress__value {
+  color: var(--kkh-ok);
+}
+.kkh-progress--success .kkh-progress__fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--kkh-ok) 55%, transparent), var(--kkh-ok));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--kkh-ok) 35%, transparent);
+}
+
+.kkh-progress--danger .kkh-progress__value {
+  color: var(--kkh-danger);
+}
+.kkh-progress--danger .kkh-progress__fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--kkh-danger) 55%, transparent), var(--kkh-danger));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--kkh-danger) 35%, transparent);
+}
+
+.kkh-progress--warning .kkh-progress__value {
+  color: var(--kkh-warning);
+}
+.kkh-progress--warning .kkh-progress__fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--kkh-warning) 55%, transparent), var(--kkh-warning));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--kkh-warning) 35%, transparent);
+}
+
+.kkh-progress--info .kkh-progress__value {
+  color: var(--kkh-info);
+}
+.kkh-progress--info .kkh-progress__fill {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--kkh-info) 55%, transparent), var(--kkh-info));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--kkh-info) 35%, transparent);
 }
 
 .shadow-xs,
