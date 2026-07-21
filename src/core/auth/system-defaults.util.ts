@@ -6,7 +6,15 @@ export const SYSADMIN_ROLE_NAME = 'sysadmin';
 export const SYSADMIN_NORMALIZED_NAME = 'SYSADMIN';
 export const DEFAULT_ADMIN_EMAIL = 'systemadmin@default.com';
 
-export const CORE_RESOURCES = ['users', 'roles', 'permissions', 'navigation', 'resources'] as const;
+export const CORE_RESOURCES = [
+  'users',
+  'roles',
+  'permissions',
+  'navigation',
+  'resources',
+  'sms_authentication',
+  'email_authentication'
+] as const;
 
 export function isSysAdminRole(nameOrNormalized?: string | null): boolean {
   if (!nameOrNormalized) return false;
@@ -58,7 +66,9 @@ export function isProtectedNavigation(resource?: string | null, route?: string |
     normalized === '/admin/roles' ||
     normalized === '/admin/permissions' ||
     normalized === '/admin/navigation' ||
-    normalized === '/admin/resources'
+    normalized === '/admin/resources' ||
+    normalized === '/admin/sms-authentication' ||
+    normalized === '/admin/email-authentication'
   );
 }
 

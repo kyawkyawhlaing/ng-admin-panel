@@ -68,6 +68,20 @@ export const routes: Routes = [
         loadComponent: () => import('../features/admin/resources/resources').then(m => m.ResourcesComponent)
       },
       {
+        path: 'sms-authentication',
+        canActivate: [permissionGuard],
+        data: { permissions: ['sms_authentication_access'] },
+        loadComponent: () =>
+          import('../features/admin/sms-authentication/sms-authentication').then(m => m.SmsAuthenticationComponent)
+      },
+      {
+        path: 'email-authentication',
+        canActivate: [permissionGuard],
+        data: { permissions: ['email_authentication_access'] },
+        loadComponent: () =>
+          import('../features/admin/email-authentication/email-authentication').then(m => m.EmailAuthenticationComponent)
+      },
+      {
         path: 'profile',
         loadComponent: () => import('../features/admin/profile/profile').then(m => m.UserProfileComponent)
       },
