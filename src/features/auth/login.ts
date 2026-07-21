@@ -4,6 +4,11 @@ import { RouterLink } from '@angular/router';
 import { AuthStore, AuthStoreType } from '../../core/stores/auth-store';
 import { ThemeStore } from '../../core/stores/theme-store';
 import {
+  MFA_ACCESS_CODE_FORMAT_HINT,
+  mfaAccessCodeValidator,
+  mfaOtpErrorMessage
+} from '../../core/auth/mfa-otp.util';
+import {
   KkhAlertComponent,
   KkhButtonComponent,
   KkhInputComponent,
@@ -94,7 +99,7 @@ import {
                 }
 
                 <p class="text-sm text-[var(--kkh-muted)]">
-                  Enter the 6-digit code from your authenticator app, or a one-time recovery code.
+                  {{ MFA_ACCESS_CODE_FORMAT_HINT }}.
                 </p>
 
                 @if (isLoading()) {
@@ -108,7 +113,7 @@ import {
                   autocomplete="one-time-code"
                   placeholder="123456"
                   formControlName="code"
-                  [error]="mfaForm.controls.code.touched && mfaForm.controls.code.invalid ? 'Enter a valid code' : null"
+                  [error]="mfaCodeError()"
                 />
 
                 <div class="flex flex-col gap-3 pt-1">
@@ -138,6 +143,8 @@ export class LoginComponent {
   protected readonly themeStore = inject(ThemeStore);
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
+  protected readonly MFA_ACCESS_CODE_FORMAT_HINT = MFA_ACCESS_CODE_FORMAT_HINT;
+
   protected readonly isLoading = computed(() => this.authStore.isLoading());
   protected readonly errorMessage = computed(() => this.authStore.error());
   protected readonly mfaStep = computed(() => this.authStore.isMfaPending());
@@ -156,9 +163,13 @@ export class LoginComponent {
   protected readonly mfaForm = new FormGroup({
     code: new FormControl('', {
       nonNullable: true,
-      validators: [Validators.required, Validators.minLength(6)]
+      validators: [Validators.required, mfaAccessCodeValidator()]
     })
   });
+
+  protected mfaCodeError(): string | null {
+    return mfaOtpErrorMessage(this.mfaForm.controls.code, { accessCode: true });
+  }
 
   protected async onSubmit(): Promise<void> {
     if (this.loginForm.invalid) {

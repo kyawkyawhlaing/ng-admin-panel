@@ -22,7 +22,6 @@ export interface TotpSetupResult {
 
 export interface ConfirmTotpResult {
   recoveryCodes: string[];
-  accessToken: string;
 }
 
 export interface ProfileState {
@@ -140,20 +139,13 @@ export const ProfileStore = signalStore(
           const result = await lastValueFrom(
             http.post<ConfirmTotpResult>('/users/me/mfa/totp/confirm', { code })
           );
-          if (!authStore.applyAccessToken(result.accessToken)) {
-            patchState(store, {
-              error: 'MFA enabled but session upgrade failed. Sign in again.',
-              isMfaBusy: false
-            });
-            return false;
-          }
-          await loadMfaStatus();
           patchState(store, {
             totpSetup: null,
             recoveryCodes: result.recoveryCodes,
             isMfaBusy: false,
-            successMessage: 'Two-factor authentication is now enabled.'
+            successMessage: 'Two-factor authentication is now enabled. Please sign in again.'
           });
+          await authStore.logout();
           return true;
         } catch (err: any) {
           patchState(store, { error: apiError(err, 'Invalid verification code'), isMfaBusy: false });

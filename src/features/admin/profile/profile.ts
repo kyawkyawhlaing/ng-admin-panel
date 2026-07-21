@@ -2,6 +2,12 @@ import { Component, inject, computed, signal, effect, OnInit } from '@angular/co
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
+import {
+  mfaAccessCodeValidator,
+  mfaOtpErrorMessage,
+  mfaOtpValidator,
+  MFA_OTP_LENGTH
+} from '../../../core/auth/mfa-otp.util';
 import { ProfileStore } from './profile-store';
 import {
   KkhPageHeaderComponent,
@@ -164,7 +170,16 @@ type Tab = 'personal' | 'security' | 'preferences';
                             </div>
                             <form [formGroup]="totpConfirmForm" (ngSubmit)="onConfirmTotp()" class="flex flex-col sm:flex-row gap-3 items-end max-w-md">
                               <div class="flex-1 w-full">
-                                <kkh-input label="Verification code" formControlName="code" autocomplete="one-time-code" placeholder="123456" />
+                                <kkh-input
+                                  label="Verification code"
+                                  formControlName="code"
+                                  autocomplete="one-time-code"
+                                  placeholder="123456"
+                                  inputMode="numeric"
+                                  [otpMode]="true"
+                                  [maxLength]="MFA_OTP_LENGTH"
+                                  [error]="totpCodeError()"
+                                />
                               </div>
                               <kkh-button variant="primary" type="submit" [loading]="profileStore.isMfaBusy()" [disabled]="totpConfirmForm.invalid">
                                 Confirm
@@ -282,7 +297,11 @@ type Tab = 'personal' | 'security' | 'preferences';
     >
       <form [formGroup]="disableMfaForm" class="space-y-4">
         <kkh-input label="Password" type="password" formControlName="password" />
-        <kkh-input label="Authenticator or recovery code" formControlName="code" />
+        <kkh-input
+          label="Authenticator or recovery code"
+          formControlName="code"
+          [error]="disableMfaCodeError()"
+        />
       </form>
     </kkh-dialog>
 
@@ -297,12 +316,18 @@ type Tab = 'personal' | 'security' | 'preferences';
     >
       <form [formGroup]="regenerateForm" class="space-y-4">
         <kkh-input label="Password" type="password" formControlName="password" />
-        <kkh-input label="Authenticator code" formControlName="code" />
+        <kkh-input
+          label="Authenticator or recovery code"
+          formControlName="code"
+          [error]="regenerateCodeError()"
+        />
       </form>
     </kkh-dialog>
   `
 })
 export class UserProfileComponent implements OnInit {
+  protected readonly MFA_OTP_LENGTH = MFA_OTP_LENGTH;
+
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
   protected readonly profileStore = inject(ProfileStore);
   private readonly fb = inject(FormBuilder);
@@ -353,17 +378,17 @@ export class UserProfileComponent implements OnInit {
     });
 
     this.totpConfirmForm = this.fb.group({
-      code: ['', [Validators.required, Validators.minLength(6)]]
+      code: ['', [Validators.required, mfaOtpValidator()]]
     });
 
     this.disableMfaForm = this.fb.group({
       password: ['', Validators.required],
-      code: ['', Validators.required]
+      code: ['', [Validators.required, mfaAccessCodeValidator()]]
     });
 
     this.regenerateForm = this.fb.group({
       password: ['', Validators.required],
-      code: ['', Validators.required]
+      code: ['', [Validators.required, mfaAccessCodeValidator()]]
     });
 
     effect(() => {
@@ -412,6 +437,18 @@ export class UserProfileComponent implements OnInit {
   private passwordMatchValidator(g: FormGroup) {
     return g.get('newPassword')?.value === g.get('confirmPassword')?.value
       ? null : { mismatch: true };
+  }
+
+  protected totpCodeError(): string | null {
+    return mfaOtpErrorMessage(this.totpConfirmForm.controls['code']);
+  }
+
+  protected disableMfaCodeError(): string | null {
+    return mfaOtpErrorMessage(this.disableMfaForm.controls['code'], { accessCode: true });
+  }
+
+  protected regenerateCodeError(): string | null {
+    return mfaOtpErrorMessage(this.regenerateForm.controls['code'], { accessCode: true });
   }
 
   protected onSavePersonal(): void {

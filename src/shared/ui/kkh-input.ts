@@ -11,6 +11,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-angular';
+import { normalizeMfaOtpInput } from '../../core/auth/mfa-otp.util';
 
 @Component({
   selector: 'kkh-input',
@@ -49,6 +50,9 @@ import {
           [attr.type]="resolvedType()"
           [attr.placeholder]="placeholder() || null"
           [attr.autocomplete]="autocomplete()"
+          [attr.maxlength]="maxLength()"
+          [attr.inputmode]="inputMode()"
+          [attr.pattern]="pattern()"
           [disabled]="isDisabled()"
           [value]="value()"
           (input)="onInput($event)"
@@ -89,6 +93,11 @@ export class KkhInputComponent implements ControlValueAccessor {
   readonly error = input<string | null>(null);
   /** Lucide icon name shown on the left (e.g. mail, lock, search, user). */
   readonly icon = input<string | null>(null);
+  /** Strip non-digits and cap at 6 characters (authenticator OTP fields). */
+  readonly otpMode = input(false);
+  readonly maxLength = input<number | null>(null);
+  readonly inputMode = input<string | null>(null);
+  readonly pattern = input<string | null>(null);
   /** Show eye toggle for password fields. Defaults to true when type is password. */
   readonly revealable = input<boolean | null>(null);
 
@@ -126,7 +135,14 @@ export class KkhInputComponent implements ControlValueAccessor {
   }
 
   protected onInput(event: Event): void {
-    const next = (event.target as HTMLInputElement).value;
+    const input = event.target as HTMLInputElement;
+    let next = input.value;
+    if (this.otpMode()) {
+      next = normalizeMfaOtpInput(next);
+      if (input.value !== next) {
+        input.value = next;
+      }
+    }
     this.value.set(next);
     this.onChange(next);
   }
