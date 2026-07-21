@@ -5,7 +5,7 @@ import { AdminStore, AdminStoreType } from '../admin-store';
 import { RolesStore } from './roles-store';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { isAccessAction, normalizeRolePermissionIds } from '../../../core/auth/permission.util';
-import { isSysAdminRole } from '../../../core/auth/system-defaults.util';
+import { isBuiltInRole, isSysAdminRole } from '../../../core/auth/system-defaults.util';
 import {
   isValidCustomRoleName,
   ensureRoleNamePrefix,
@@ -36,7 +36,7 @@ function roleNameFormatValidator(control: AbstractControl): ValidationErrors | n
     return null;
   }
   const normalized = ensureRoleNamePrefix(raw);
-  if (isSysAdminRole(normalized) || isValidCustomRoleName(normalized)) {
+  if (isBuiltInRole(normalized) || isValidCustomRoleName(normalized)) {
     return null;
   }
   return { roleNameFormat: true };
@@ -140,16 +140,16 @@ function roleSuffixValidator(control: AbstractControl): ValidationErrors | null 
             type="button"
             class="kkh-relation-summary"
             [class.kkh-relation-summary--empty]="count === 0"
-            [disabled]="!canEdit() || isProtectedRole(row)"
-            (click)="canEdit() && !isProtectedRole(row) && openAssignDialog(row.id.toString())"
-            [attr.aria-label]="isProtectedRole(row) ? 'System role permissions are locked' : (count === 0 ? 'Assign permissions' : 'Manage ' + count + ' permissions')"
-            [title]="isProtectedRole(row) ? 'sysadmin permissions cannot be edited' : (count === 0 ? 'Assign permissions' : count + ' permissions mapped — click to manage')"
+            [disabled]="!canEdit() || isSysAdminLockedRole(row)"
+            (click)="canEdit() && !isSysAdminLockedRole(row) && openAssignDialog(row.id.toString())"
+            [attr.aria-label]="isSysAdminLockedRole(row) ? 'System role permissions are locked' : (count === 0 ? 'Assign permissions' : 'Manage ' + count + ' permissions')"
+            [title]="isSysAdminLockedRole(row) ? 'ROLE_SYSADMIN permissions cannot be edited' : (count === 0 ? 'Assign permissions' : count + ' permissions mapped — click to manage')"
           >
             <span class="kkh-relation-summary__count">
               <span class="kkh-relation-summary__label">
                 {{ count === 0 ? 'None mapped' : count + (count === 1 ? ' permission' : ' permissions') }}
               </span>
-              @if (canEdit() && !isProtectedRole(row)) {
+              @if (canEdit() && !isSysAdminLockedRole(row)) {
                 <span class="kkh-relation-summary__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 20h9" />
@@ -413,6 +413,10 @@ export class RolesComponent implements OnInit {
   }
 
   protected isProtectedRole(role: RolesTable): boolean {
+    return isBuiltInRole(role.normalized_name) || isBuiltInRole(role.name);
+  }
+
+  protected isSysAdminLockedRole(role: RolesTable): boolean {
     return isSysAdminRole(role.normalized_name) || isSysAdminRole(role.name);
   }
 
@@ -431,8 +435,8 @@ export class RolesComponent implements OnInit {
     if (!roleId) return;
 
     const role = this.rolesStore.roles().find((r) => String(r.id) === roleId);
-    if (role && this.isProtectedRole(role)) {
-      // sysadmin always keeps full privilege — only allow adding missing permissions.
+    if (role && this.isSysAdminLockedRole(role)) {
+      // ROLE_SYSADMIN always keeps full privilege — only allow adding missing permissions.
       const currentPermissionIds = this.assignedPermissionIds();
       const permissions = this.adminStore.permissions();
       const normalized = normalizeRolePermissionIds(
@@ -505,15 +509,13 @@ export class RolesComponent implements OnInit {
       .some((ur) => ur.userId === userId && String(ur.roleId) === String(roleId));
     if (!hasRole) return;
 
-    this.authStore.setRbacClaims(
-      this.adminStore.getRolesForUser(userId).map((r) => r.name),
-      this.adminStore.getPermissionCodesForUser(userId)
-    );
-    await this.authStore.reissueAccessToken();
-    this.authStore.setRbacClaims(
-      this.adminStore.getRolesForUser(userId).map((r) => r.name),
-      this.adminStore.getPermissionCodesForUser(userId)
-    );
+    const token = await this.authStore.reissueAccessToken();
+    if (!token) {
+      this.authStore.setRbacClaims(
+        this.adminStore.getRolesForUser(userId).map((r) => r.name),
+        this.adminStore.getPermissionCodesForUser(userId)
+      );
+    }
   }
 
   protected openCreateModal(role?: RolesTable): void {

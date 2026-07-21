@@ -19,7 +19,7 @@ import {
 import { UsersTable } from '../../../types/database';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } from 'lucide-angular';
-import { isProtectedAdminEmail, isSysAdminRole } from '../../../core/auth/system-defaults.util';
+import { isProtectedAdminEmail, isProtectedBuiltInEmail, isSysAdminRole } from '../../../core/auth/system-defaults.util';
 
 const passwordMatchValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
   const password = control.get('password');
@@ -242,7 +242,7 @@ const passwordComplexityValidators = [
                 <lucide-icon name="edit" class="h-4.5 w-4.5" [strokeWidth]="2"></lucide-icon>
               </button>
             }
-            @if (canDelete() && row.id !== authStore.user()?.id && !isProtectedUser(row)) {
+            @if (canDelete() && row.id !== authStore.user()?.id && !isBuiltInUser(row)) {
               <button
                 type="button"
                 (click)="openDeleteDialog(row)"
@@ -483,6 +483,10 @@ export class UsersComponent implements OnInit {
     return isProtectedAdminEmail(user.email);
   }
 
+  protected isBuiltInUser(user: UsersTable): boolean {
+    return isProtectedBuiltInEmail(user.email);
+  }
+
   protected openAssignDialog(userId: string): void {
     this.activeUserId.set(userId);
     this.isAssignDialogOpen.set(true);
@@ -517,18 +521,15 @@ export class UsersComponent implements OnInit {
         await this.adminStore.removeRoleFromUser(userId, roleId);
       }
 
-      // Keep auth-store + JWT in sync when editing the signed-in user.
-      // Reissue access token (Bearer) — never call /refresh-token here (avoids 401 console noise).
+      // Keep JWT claims in sync when editing the signed-in user (no /refresh-token).
       if (userId === this.authStore.user()?.id) {
-        this.authStore.setRbacClaims(
-          this.adminStore.getRolesForUser(userId).map((r) => r.name),
-          this.adminStore.getPermissionCodesForUser(userId)
-        );
-        await this.authStore.reissueAccessToken();
-        this.authStore.setRbacClaims(
-          this.adminStore.getRolesForUser(userId).map((r) => r.name),
-          this.adminStore.getPermissionCodesForUser(userId)
-        );
+        const token = await this.authStore.reissueAccessToken();
+        if (!token) {
+          this.authStore.setRbacClaims(
+            this.adminStore.getRolesForUser(userId).map((r) => r.name),
+            this.adminStore.getPermissionCodesForUser(userId)
+          );
+        }
       }
     } catch (err) {
       console.error('Error assigning user roles:', err);

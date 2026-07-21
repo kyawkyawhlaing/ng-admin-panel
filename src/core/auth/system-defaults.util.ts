@@ -2,9 +2,12 @@
 
 export const SYSTEM_DEFAULT_LABEL = 'System default';
 
-export const SYSADMIN_ROLE_NAME = 'sysadmin';
-export const SYSADMIN_NORMALIZED_NAME = 'SYSADMIN';
+export const SYSADMIN_ROLE_NAME = 'ROLE_SYSADMIN';
+export const SYSADMIN_NORMALIZED_NAME = 'ROLE_SYSADMIN';
+export const OPERATOR_ROLE_NAME = 'ROLE_OPERATOR';
+export const OPERATOR_NORMALIZED_NAME = 'ROLE_OPERATOR';
 export const DEFAULT_ADMIN_EMAIL = 'systemadmin@default.com';
+export const DEFAULT_OPERATOR_EMAIL = 'operator@default.com';
 
 export const CORE_RESOURCES = [
   'users',
@@ -16,10 +19,22 @@ export const CORE_RESOURCES = [
   'email_authentication'
 ] as const;
 
+export const OPERATOR_EXCLUDED_RESOURCES = ['sms_authentication', 'email_authentication'] as const;
+
 export function isSysAdminRole(nameOrNormalized?: string | null): boolean {
   if (!nameOrNormalized) return false;
   const value = nameOrNormalized.trim().toUpperCase();
-  return value === 'SYSADMIN' || value === 'ADMIN';
+  return value === 'ROLE_SYSADMIN' || value === 'SYSADMIN' || value === 'ADMIN';
+}
+
+export function isOperatorRole(nameOrNormalized?: string | null): boolean {
+  if (!nameOrNormalized) return false;
+  const value = nameOrNormalized.trim().toUpperCase();
+  return value === 'ROLE_OPERATOR' || value === 'OPERATOR';
+}
+
+export function isBuiltInRole(nameOrNormalized?: string | null): boolean {
+  return isSysAdminRole(nameOrNormalized) || isOperatorRole(nameOrNormalized);
 }
 
 export function isCoreResource(resource?: string | null): boolean {
@@ -72,7 +87,15 @@ export function isProtectedNavigation(resource?: string | null, route?: string |
   );
 }
 
+/** System admin email — fully locked in the Users UI. */
 export function isProtectedAdminEmail(email?: string | null): boolean {
   if (!email) return false;
   return email.trim().toLowerCase() === DEFAULT_ADMIN_EMAIL;
+}
+
+/** Built-in users that cannot be deleted (system admin + operator). */
+export function isProtectedBuiltInEmail(email?: string | null): boolean {
+  if (!email) return false;
+  const value = email.trim().toLowerCase();
+  return value === DEFAULT_ADMIN_EMAIL || value === DEFAULT_OPERATOR_EMAIL;
 }
