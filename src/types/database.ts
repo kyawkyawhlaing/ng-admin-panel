@@ -40,9 +40,10 @@ export interface RolesPermissionsTable {
 export interface UsersTable {
   id: string;
   display_name: string;
-  email: string;
+    email: string;
   first_name: string;
   last_name: string;
+  phone_number?: string | null;
   first_time_login: boolean;
   two_factor_enabled: boolean;
   two_factor_required: boolean;

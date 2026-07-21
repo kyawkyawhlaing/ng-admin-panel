@@ -120,14 +120,22 @@ export class KkhTransferComponent {
   protected readonly rightSelected = signal(new Set<string>());
   private readonly debouncedFilter = createDebouncedTask(LOCAL_FILTER_DEBOUNCE_MS);
 
+  private wasOpen = false;
+
   constructor() {
     effect(() => {
-      this.selectedIds.set([...this.assignedItemIds()]);
-      this.leftSelected.set(new Set());
-      this.rightSelected.set(new Set());
-      this.filterInput.set('');
-      this.filter.set('');
-      this.debouncedFilter.cancel();
+      const isOpen = this.open();
+      // Seed only on open transition so in-progress assign moves are not wiped
+      // when parent assignedItemIds recomputes.
+      if (isOpen && !this.wasOpen) {
+        this.selectedIds.set([...this.assignedItemIds()]);
+        this.leftSelected.set(new Set());
+        this.rightSelected.set(new Set());
+        this.filterInput.set('');
+        this.filter.set('');
+        this.debouncedFilter.cancel();
+      }
+      this.wasOpen = isOpen;
     });
   }
 

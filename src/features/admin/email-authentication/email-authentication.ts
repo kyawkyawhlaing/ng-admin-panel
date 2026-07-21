@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, OnInit } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { DatePipe } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { MFA_OTP_LENGTH } from '../../../core/auth/mfa-otp.util';
 import {
@@ -8,23 +8,33 @@ import {
   KkhButtonComponent,
   KkhInputComponent,
   KkhSelectComponent,
+  KkhTextareaComponent,
   KkhAlertComponent,
   KkhSystemDefaultBadgeComponent
 } from '../../../shared/ui';
 import { SelectOption } from '../../../shared/data/list.types';
 import { EmailAuthenticationStore } from './email-authentication-store';
+import { AuthChannelStatusPanelComponent } from '../authentication-shared/auth-channel-status-panel';
+import { formatAuthTemplatePreview, formatExpiryLabel, providerLabel } from '../authentication-shared/auth-channel.util';
+
+const EMAIL_PROVIDER_LABELS: Record<string, string> = {
+  smtp: 'SMTP',
+  sendgrid: 'SendGrid',
+  ses: 'Amazon SES'
+};
 
 @Component({
   selector: 'app-email-authentication',
   imports: [
     ReactiveFormsModule,
-    DatePipe,
     KkhPageHeaderComponent,
     KkhButtonComponent,
     KkhInputComponent,
     KkhSelectComponent,
+    KkhTextareaComponent,
     KkhAlertComponent,
-    KkhSystemDefaultBadgeComponent
+    KkhSystemDefaultBadgeComponent,
+    AuthChannelStatusPanelComponent
   ],
   providers: [EmailAuthenticationStore],
   template: `
@@ -32,96 +42,163 @@ import { EmailAuthenticationStore } from './email-authentication-store';
       <kkh-page-header
         eyebrow="AUTHENTICATION"
         title="Email Authentication"
-        description="Configure flexible email OTP delivery for console sign-in and verification flows."
+        description="Configure email OTP delivery, provider credentials, and templates for configurable sign-in flows."
       >
         <kkh-system-default-badge />
       </kkh-page-header>
 
       @if (!canView()) {
-        <kkh-alert tone="danger">You need email_authentication_view to load email authentication settings.</kkh-alert>
+        <kkh-alert tone="danger" title="Access denied">
+          You need <code class="font-mono text-xs">email_authentication_view</code> to manage email settings.
+        </kkh-alert>
       } @else {
         @if (store.error()) {
-          <kkh-alert tone="danger">{{ store.error() }}</kkh-alert>
+          <kkh-alert tone="danger" [dismissible]="true" (dismissed)="store.clearMessages()">{{ store.error() }}</kkh-alert>
         }
         @if (store.successMessage()) {
-          <kkh-alert tone="success">{{ store.successMessage() }}</kkh-alert>
+          <kkh-alert tone="success" [dismissible]="true" (dismissed)="store.clearMessages()">{{ store.successMessage() }}</kkh-alert>
         }
 
         @if (store.isLoading()) {
-          <div class="kkh-panel p-8 text-sm text-[var(--kkh-muted)]">Loading email authentication settings…</div>
+          <div class="kkh-panel flex items-center justify-center gap-3 p-12 text-sm text-[var(--kkh-muted)]">
+            <div class="h-6 w-6 animate-spin border border-[var(--kkh-accent)] border-t-transparent" style="border-radius: 9999px"></div>
+            Loading email authentication settings…
+          </div>
         } @else {
-          <form [formGroup]="form" (ngSubmit)="onSubmit()" class="kkh-panel p-6 space-y-6 relative">
-            <div class="kkh-rail"></div>
-
-            <section class="space-y-4">
-              <h2 class="text-sm font-semibold text-[var(--kkh-text)]">Channel</h2>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label class="flex items-center gap-3 text-sm text-[var(--kkh-text)]">
-                  <input type="checkbox" formControlName="is_enabled" class="h-4 w-4 accent-[var(--kkh-accent)]" [disabled]="!canEdit()" />
-                  Enable email OTP authentication
-                </label>
-                <kkh-select
-                  label="Provider"
-                  formControlName="provider"
-                  [options]="providerOptions"
-                  [error]="providerError()"
-                />
-              </div>
-            </section>
-
-            <section class="space-y-4 border-t border-[var(--kkh-border)] pt-6">
-              <h2 class="text-sm font-semibold text-[var(--kkh-text)]">Delivery settings</h2>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <kkh-input label="SMTP host" formControlName="smtp_host" placeholder="smtp.example.com" />
-                <kkh-input label="SMTP port" type="number" formControlName="smtp_port" />
-                <kkh-input label="From email" formControlName="from_email" placeholder="noreply@example.com" />
-                <kkh-input label="From name" formControlName="from_name" placeholder="KyawHlaing Console" />
-                <kkh-input label="Username / API user" formControlName="username" />
-                <kkh-input
-                  label="Password / API key"
-                  type="password"
-                  formControlName="password_secret"
-                  [placeholder]="settings()?.has_password_secret ? 'Leave blank to keep existing secret' : 'Enter password or API key'"
-                />
-                <label class="flex items-center gap-3 text-sm text-[var(--kkh-text)] md:col-span-2">
-                  <input type="checkbox" formControlName="use_tls" class="h-4 w-4 accent-[var(--kkh-accent)]" [disabled]="!canEdit()" />
-                  Use TLS
-                </label>
-              </div>
-            </section>
-
-            <section class="space-y-4 border-t border-[var(--kkh-border)] pt-6">
-              <h2 class="text-sm font-semibold text-[var(--kkh-text)]">OTP policy</h2>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <kkh-input label="OTP length" formControlName="otp_length" [hint]="'Fixed at ' + otpLength + ' digits'" />
-                <kkh-input label="Expiry (seconds)" type="number" formControlName="otp_expiry_seconds" />
-                <kkh-input label="Max attempts / hour" type="number" formControlName="max_attempts_per_hour" />
-              </div>
-              <kkh-input label="Subject template" formControlName="subject_template" />
-              <kkh-input
-                label="Body template"
-                formControlName="body_template"
-                hint="Use {code} and {minutes} placeholders."
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <aside class="lg:col-span-1">
+              <auth-channel-status-panel
+                icon="mail"
+                channelLabel="Delivery channel"
+                title="Email OTP"
+                [enabled]="form.controls.is_enabled.value"
+                [providerName]="providerDisplayName()"
+                [otpLength]="otpLength"
+                [otpExpirySeconds]="form.controls.otp_expiry_seconds.value"
+                [maxAttempts]="form.controls.max_attempts_per_hour.value"
+                [updatedAt]="settings()?.updated_at"
+                [updatedBy]="settings()?.updated_by"
               />
-            </section>
+            </aside>
 
-            @if (settings()?.updated_at) {
-              <p class="text-xs text-[var(--kkh-muted)]">
-                Last updated {{ settings()!.updated_at | date:'yyyy-MM-dd HH:mm' }}
-                @if (settings()?.updated_by) {
-                  by {{ settings()!.updated_by }}
-                }
-              </p>
-            }
+            <div class="lg:col-span-2">
+              <form [formGroup]="form" (ngSubmit)="onSubmit()" class="kkh-panel relative overflow-hidden">
+                <div class="kkh-rail"></div>
+                <div class="space-y-0 p-6 md:p-8">
+                  <section class="kkh-auth-section">
+                    <div class="kkh-auth-section__head">
+                      <h2 class="kkh-auth-section__title">Channel status</h2>
+                      <p class="kkh-auth-section__desc">
+                        When enabled, email OTP can be used for login and API endpoint step-up rules.
+                      </p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      <label class="kkh-switch md:col-span-2">
+                        <input type="checkbox" formControlName="is_enabled" [disabled]="!canEdit()" />
+                        <span class="kkh-switch__track" aria-hidden="true"></span>
+                        <span class="kkh-switch__label">Enable email OTP authentication</span>
+                      </label>
+                      <kkh-select
+                        label="Provider"
+                        formControlName="provider"
+                        [options]="providerOptions"
+                        [error]="providerError()"
+                      />
+                    </div>
+                  </section>
 
-            @if (canEdit()) {
-              <div class="flex justify-end border-t border-[var(--kkh-border)] pt-4">
-                <kkh-button variant="primary" type="submit" [loading]="store.isSaving()" [disabled]="form.invalid || store.isSaving()">
-                  Save settings
-                </kkh-button>
-              </div>
-            }
-          </form>
+                  <section class="kkh-auth-section">
+                    <div class="kkh-auth-section__head">
+                      <h2 class="kkh-auth-section__title">Sender &amp; credentials</h2>
+                      <p class="kkh-auth-section__desc">{{ deliveryDescription() }}</p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      @if (isSmtp()) {
+                        <kkh-input label="SMTP host" formControlName="smtp_host" placeholder="smtp.example.com" />
+                        <kkh-input label="SMTP port" type="number" formControlName="smtp_port" />
+                        <label class="kkh-switch md:col-span-2">
+                          <input type="checkbox" formControlName="use_tls" [disabled]="!canEdit()" />
+                          <span class="kkh-switch__track" aria-hidden="true"></span>
+                          <span class="kkh-switch__label">Use TLS (STARTTLS)</span>
+                        </label>
+                      }
+                      <kkh-input label="From email" formControlName="from_email" placeholder="noreply@example.com" />
+                      <kkh-input label="From name" formControlName="from_name" placeholder="KyawHlaing Console" />
+                      <kkh-input
+                        [label]="usernameLabel()"
+                        formControlName="username"
+                        [placeholder]="usernamePlaceholder()"
+                      />
+                      <kkh-input
+                        [label]="secretLabel()"
+                        type="password"
+                        formControlName="password_secret"
+                        [placeholder]="settings()?.has_password_secret ? 'Leave blank to keep existing secret' : secretPlaceholder()"
+                      />
+                    </div>
+                  </section>
+
+                  <section class="kkh-auth-section">
+                    <div class="kkh-auth-section__head">
+                      <h2 class="kkh-auth-section__title">OTP policy</h2>
+                      <p class="kkh-auth-section__desc">
+                        Codes are fixed at {{ otpLength }} digits. Expiry applies to each challenge session.
+                      </p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+                      <kkh-input label="OTP length" formControlName="otp_length" [hint]="'Fixed at ' + otpLength + ' digits'" />
+                      <kkh-input
+                        label="Expiry (seconds)"
+                        type="number"
+                        formControlName="otp_expiry_seconds"
+                        [hint]="'≈ ' + expiryHint()"
+                      />
+                      <kkh-input label="Max attempts / hour" type="number" formControlName="max_attempts_per_hour" />
+                    </div>
+                  </section>
+
+                  <section class="kkh-auth-section">
+                    <div class="kkh-auth-section__head">
+                      <h2 class="kkh-auth-section__title">Email templates</h2>
+                      <p class="kkh-auth-section__desc">
+                        Use <code class="font-mono text-xs">{{ codeToken }}</code> and <code class="font-mono text-xs">{{ minutesToken }}</code> placeholders.
+                      </p>
+                    </div>
+                    <kkh-input label="Subject" formControlName="subject_template" placeholder="Your KyawHlaing verification code" />
+                    <div class="mt-5">
+                      <kkh-textarea
+                        label="Body"
+                        formControlName="body_template"
+                        [rows]="5"
+                        [placeholder]="defaultBodyPlaceholder"
+                      />
+                    </div>
+                    <div class="kkh-template-preview mt-3">
+                      <span class="kkh-template-preview__label">Preview</span>
+                      <strong class="block text-sm font-semibold text-[var(--kkh-text)] mb-1">{{ subjectPreview() }}</strong>
+                      {{ bodyPreview() }}
+                    </div>
+                  </section>
+
+                  @if (canEdit()) {
+                    <div class="flex flex-col gap-3 border-t border-[var(--kkh-border)] pt-6 sm:flex-row sm:items-center sm:justify-between">
+                      <p class="text-xs text-[var(--kkh-muted)]">
+                        Changes apply immediately to new OTP challenges.
+                      </p>
+                      <kkh-button
+                        variant="primary"
+                        type="submit"
+                        [loading]="store.isSaving()"
+                        [disabled]="form.invalid || store.isSaving() || !form.dirty"
+                      >
+                        Save email settings
+                      </kkh-button>
+                    </div>
+                  }
+                </div>
+              </form>
+            </div>
+          </div>
         }
       }
     </div>
@@ -132,6 +209,10 @@ export class EmailAuthenticationComponent implements OnInit {
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
   protected readonly otpLength = MFA_OTP_LENGTH;
+  protected readonly codeToken = '{code}';
+  protected readonly minutesToken = '{minutes}';
+  protected readonly defaultBodyPlaceholder =
+    'Your verification code is {code}. It expires in {minutes} minutes.';
   protected readonly settings = computed(() => this.store.settings());
   protected readonly canView = computed(() => this.authStore.hasPermission('email_authentication_view'));
   protected readonly canEdit = computed(() => this.authStore.hasPermission('email_authentication_edit'));
@@ -146,43 +227,80 @@ export class EmailAuthenticationComponent implements OnInit {
     is_enabled: new FormControl(false, { nonNullable: true }),
     provider: new FormControl('smtp', { nonNullable: true, validators: [Validators.required] }),
     smtp_host: new FormControl('', { nonNullable: true }),
-    smtp_port: new FormControl(587, { nonNullable: true, validators: [Validators.required, Validators.min(1), Validators.max(65535)] }),
+    smtp_port: new FormControl(587, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(1), Validators.max(65535)]
+    }),
     use_tls: new FormControl(true, { nonNullable: true }),
     from_email: new FormControl('', { nonNullable: true }),
     from_name: new FormControl('', { nonNullable: true }),
     username: new FormControl('', { nonNullable: true }),
     password_secret: new FormControl('', { nonNullable: true }),
     otp_length: new FormControl({ value: MFA_OTP_LENGTH, disabled: true }, { nonNullable: true }),
-    otp_expiry_seconds: new FormControl(300, { nonNullable: true, validators: [Validators.required, Validators.min(60), Validators.max(3600)] }),
-    max_attempts_per_hour: new FormControl(5, { nonNullable: true, validators: [Validators.required, Validators.min(1), Validators.max(100)] }),
-    subject_template: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(256)] }),
-    body_template: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(1024)] })
+    otp_expiry_seconds: new FormControl(300, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(60), Validators.max(3600)]
+    }),
+    max_attempts_per_hour: new FormControl(5, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(1), Validators.max(100)]
+    }),
+    subject_template: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(256)]
+    }),
+    body_template: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(1024)]
+    })
+  });
+
+  private readonly providerValue = toSignal(this.form.controls.provider.valueChanges, {
+    initialValue: this.form.controls.provider.value
+  });
+
+  private readonly subjectValue = toSignal(this.form.controls.subject_template.valueChanges, {
+    initialValue: this.form.controls.subject_template.value
+  });
+
+  private readonly bodyValue = toSignal(this.form.controls.body_template.valueChanges, {
+    initialValue: this.form.controls.body_template.value
+  });
+
+  private readonly expiryValue = toSignal(this.form.controls.otp_expiry_seconds.valueChanges, {
+    initialValue: this.form.controls.otp_expiry_seconds.value
   });
 
   constructor() {
     effect(() => {
       const settings = this.store.settings();
       if (!settings) return;
-      this.form.patchValue({
-        is_enabled: settings.is_enabled,
-        provider: settings.provider,
-        smtp_host: settings.smtp_host ?? '',
-        smtp_port: settings.smtp_port,
-        use_tls: settings.use_tls,
-        from_email: settings.from_email ?? '',
-        from_name: settings.from_name ?? '',
-        username: settings.username ?? '',
-        otp_expiry_seconds: settings.otp_expiry_seconds,
-        max_attempts_per_hour: settings.max_attempts_per_hour,
-        subject_template: settings.subject_template,
-        body_template: settings.body_template
-      });
-      if (!this.canEdit()) {
-        this.form.disable({ emitEvent: false });
-      } else {
-        this.form.enable({ emitEvent: false });
-        this.form.controls.otp_length.disable({ emitEvent: false });
-      }
+
+      this.form.patchValue(
+        {
+          is_enabled: settings.is_enabled,
+          provider: settings.provider,
+          smtp_host: settings.smtp_host ?? '',
+          smtp_port: settings.smtp_port,
+          use_tls: settings.use_tls,
+          from_email: settings.from_email ?? '',
+          from_name: settings.from_name ?? '',
+          username: settings.username ?? '',
+          otp_expiry_seconds: settings.otp_expiry_seconds,
+          max_attempts_per_hour: settings.max_attempts_per_hour,
+          subject_template: settings.subject_template,
+          body_template: settings.body_template
+        },
+        { emitEvent: false }
+      );
+
+      this.applyEditState();
+      this.form.markAsPristine();
+    });
+
+    effect(() => {
+      this.canEdit();
+      this.applyEditState();
     });
   }
 
@@ -190,6 +308,57 @@ export class EmailAuthenticationComponent implements OnInit {
     if (this.canView()) {
       void this.store.loadSettings();
     }
+  }
+
+  protected isSmtp(): boolean {
+    return this.providerValue() === 'smtp';
+  }
+
+  protected providerDisplayName(): string {
+    return providerLabel(this.providerValue(), EMAIL_PROVIDER_LABELS);
+  }
+
+  protected deliveryDescription(): string {
+    switch (this.providerValue()) {
+      case 'sendgrid':
+        return 'SendGrid uses your API key and verified sender identity.';
+      case 'ses':
+        return 'Amazon SES uses SMTP credentials from your AWS account.';
+      default:
+        return 'Connect to your SMTP relay for outbound OTP email.';
+    }
+  }
+
+  protected usernameLabel(): string {
+    return this.providerValue() === 'sendgrid' ? 'API user (optional)' : 'Username';
+  }
+
+  protected usernamePlaceholder(): string {
+    return this.providerValue() === 'sendgrid' ? 'apikey' : 'SMTP username';
+  }
+
+  protected secretLabel(): string {
+    return this.providerValue() === 'sendgrid' ? 'API key' : 'Password';
+  }
+
+  protected secretPlaceholder(): string {
+    return this.providerValue() === 'sendgrid' ? 'SG.xxxxxxxx' : 'SMTP password';
+  }
+
+  protected subjectPreview(): string {
+    const template = this.subjectValue() || 'Your verification code';
+    const minutes = Math.max(1, Math.round((this.expiryValue() ?? 300) / 60));
+    return formatAuthTemplatePreview(template, '1'.repeat(MFA_OTP_LENGTH), minutes);
+  }
+
+  protected bodyPreview(): string {
+    const template = this.bodyValue() || 'Your verification code is {code}.';
+    const minutes = Math.max(1, Math.round((this.expiryValue() ?? 300) / 60));
+    return formatAuthTemplatePreview(template, '1'.repeat(MFA_OTP_LENGTH), minutes);
+  }
+
+  protected expiryHint(): string {
+    return formatExpiryLabel(this.expiryValue() ?? 300);
   }
 
   protected providerError(): string | null {
@@ -227,6 +396,17 @@ export class EmailAuthenticationComponent implements OnInit {
     const ok = await this.store.saveSettings(payload);
     if (ok) {
       this.form.controls.password_secret.reset('');
+      this.form.markAsPristine();
     }
+  }
+
+  private applyEditState(): void {
+    if (!this.canEdit()) {
+      this.form.disable({ emitEvent: false });
+      return;
+    }
+
+    this.form.enable({ emitEvent: false });
+    this.form.controls.otp_length.disable({ emitEvent: false });
   }
 }

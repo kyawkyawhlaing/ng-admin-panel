@@ -13,6 +13,8 @@ export interface AdminState {
   menus: Menu[];
   userRoles: UserRoleMapping[];
   rolePermissions: RolePermissionMapping[];
+  /** True after RBAC mappings are loaded or locally mutated — sidebar can trust live mappings. */
+  rbacHydrated: boolean;
 }
 
 const initialAdminState: AdminState = {
@@ -53,7 +55,8 @@ const initialAdminState: AdminState = {
     { roleId: 'r3', permissionId: 'p3' },
     { roleId: 'r3', permissionId: 'p4' },
     { roleId: 'r3', permissionId: 'p5' }
-  ]
+  ],
+  rbacHydrated: false
 };
 
 export const AdminStore = signalStore(
@@ -126,7 +129,8 @@ export const AdminStore = signalStore(
             roles: backendRoles,
             permissions: backendPermissions,
             userRoles: formatted,
-            rolePermissions: formattedRolePerms
+            rolePermissions: formattedRolePerms,
+            rbacHydrated: true
           });
         } catch (err) {
           console.error('Error loading real data for admin store', err);
@@ -139,11 +143,16 @@ export const AdminStore = signalStore(
         try {
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
           await lastValueFrom(http.post('/users/assign-roles', { userId, roleId: numRoleId }));
-          const updated = [...store.userRoles(), { userId, roleId: roleId.toString() }];
-          patchState(store, { userRoles: updated });
+          const roleKey = String(roleId);
+          const exists = store.userRoles().some((m) => m.userId === userId && String(m.roleId) === roleKey);
+          const updated = exists
+            ? store.userRoles()
+            : [...store.userRoles(), { userId, roleId: roleKey }];
+          patchState(store, { userRoles: updated, rbacHydrated: true });
           patchState(store, setLoaded());
         } catch (err: any) {
           patchState(store, setError(err.message));
+          throw err;
         }
       },
 
@@ -152,11 +161,15 @@ export const AdminStore = signalStore(
         try {
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
           await lastValueFrom(http.post('/users/remove-roles', { userId, roleId: numRoleId }));
-          const updated = store.userRoles().filter(m => !(m.userId === userId && m.roleId === roleId.toString()));
-          patchState(store, { userRoles: updated });
+          const roleKey = String(roleId);
+          const updated = store.userRoles().filter(
+            (m) => !(m.userId === userId && String(m.roleId) === roleKey)
+          );
+          patchState(store, { userRoles: updated, rbacHydrated: true });
           patchState(store, setLoaded());
         } catch (err: any) {
           patchState(store, setError(err.message));
+          throw err;
         }
       },
 
@@ -167,11 +180,19 @@ export const AdminStore = signalStore(
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
           const numPermissionId = typeof permissionId === 'string' ? parseInt(permissionId, 10) : permissionId;
           await lastValueFrom(http.post('/roles/assign-permission', { roleId: numRoleId, permissionId: numPermissionId }));
-          const updated = [...store.rolePermissions(), { roleId: roleId.toString(), permissionId: permissionId.toString() }];
-          patchState(store, { rolePermissions: updated });
+          const roleKey = String(roleId);
+          const permKey = String(permissionId);
+          const exists = store.rolePermissions().some(
+            (m) => String(m.roleId) === roleKey && String(m.permissionId) === permKey
+          );
+          const updated = exists
+            ? store.rolePermissions()
+            : [...store.rolePermissions(), { roleId: roleKey, permissionId: permKey }];
+          patchState(store, { rolePermissions: updated, rbacHydrated: true });
           patchState(store, setLoaded());
         } catch (err: any) {
           patchState(store, setError(err.message));
+          throw err;
         }
       },
 
@@ -181,27 +202,58 @@ export const AdminStore = signalStore(
           const numRoleId = typeof roleId === 'string' ? parseInt(roleId, 10) : roleId;
           const numPermissionId = typeof permissionId === 'string' ? parseInt(permissionId, 10) : permissionId;
           await lastValueFrom(http.post('/roles/remove-permission', { roleId: numRoleId, permissionId: numPermissionId }));
-          const updated = store.rolePermissions().filter(m => !(m.roleId === roleId.toString() && m.permissionId === permissionId.toString()));
-          patchState(store, { rolePermissions: updated });
+          const roleKey = String(roleId);
+          const permKey = String(permissionId);
+          const updated = store.rolePermissions().filter(
+            (m) => !(String(m.roleId) === roleKey && String(m.permissionId) === permKey)
+          );
+          patchState(store, { rolePermissions: updated, rbacHydrated: true });
           patchState(store, setLoaded());
         } catch (err: any) {
           patchState(store, setError(err.message));
+          throw err;
         }
       },
 
       // Entity queries (convenient accessor methods)
       getRolesForUser(userId: string): Role[] {
-        const roleIds = store.userRoles()
-          .filter(m => m.userId === userId)
-          .map(m => m.roleId);
-        return store.roles().filter(r => roleIds.includes(r.id));
+        const roleIds = new Set(
+          store.userRoles()
+            .filter((m) => m.userId === userId)
+            .map((m) => String(m.roleId))
+        );
+        return store.roles().filter((r) => roleIds.has(String(r.id)));
       },
 
       getPermissionsForRole(roleId: string): Permission[] {
-        const permIds = store.rolePermissions()
-          .filter(m => m.roleId === roleId)
-          .map(m => m.permissionId);
-        return store.permissions().filter(p => permIds.includes(p.id));
+        const roleKey = String(roleId);
+        const permIds = new Set(
+          store.rolePermissions()
+            .filter((m) => String(m.roleId) === roleKey)
+            .map((m) => String(m.permissionId))
+        );
+        return store.permissions().filter((p) => permIds.has(String(p.id)));
+      },
+
+      /** Live permission codes for a user from role mappings (signal-store source of truth). */
+      getPermissionCodesForUser(userId: string): string[] {
+        const roleIds = new Set(
+          store.userRoles()
+            .filter((m) => m.userId === userId)
+            .map((m) => String(m.roleId))
+        );
+        const permIds = new Set(
+          store.rolePermissions()
+            .filter((m) => roleIds.has(String(m.roleId)))
+            .map((m) => String(m.permissionId))
+        );
+        const codes = new Set<string>();
+        for (const p of store.permissions()) {
+          if (!permIds.has(String(p.id))) continue;
+          const code = (p.code || `${p.resource}_${p.action}`).trim();
+          if (code) codes.add(code);
+        }
+        return [...codes];
       }
     };
   })
@@ -214,6 +266,7 @@ export interface AdminStoreType {
   readonly menus: Signal<Menu[]>;
   readonly userRoles: Signal<UserRoleMapping[]>;
   readonly rolePermissions: Signal<RolePermissionMapping[]>;
+  readonly rbacHydrated: Signal<boolean>;
   readonly callState: Signal<CallState>;
   readonly isLoading: Signal<boolean>;
   readonly isLoaded: Signal<boolean>;
@@ -228,4 +281,5 @@ export interface AdminStoreType {
 
   getRolesForUser(userId: string): Role[];
   getPermissionsForRole(roleId: string): Permission[];
+  getPermissionCodesForUser(userId: string): string[];
 }

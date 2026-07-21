@@ -18,7 +18,27 @@ import {
 import { NavigationItemTable } from '../../../types/database';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { isProtectedNavigation } from '../../../core/auth/system-defaults.util';
-import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Trash2, Home, Settings, Users, Key, Database, Shield, Layout, FileText, Component as ComponentIcon } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  LUCIDE_ICONS,
+  LucideIconProvider,
+  Menu,
+  Edit,
+  Trash2,
+  Home,
+  Settings,
+  Users,
+  Key,
+  Database,
+  Shield,
+  Layout,
+  FileText,
+  Smartphone,
+  Mail,
+  Fingerprint,
+  Route,
+  Component as ComponentIcon
+} from 'lucide-angular';
 
 @Component({
   selector: 'app-admin-navigation',
@@ -54,6 +74,10 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Tras
         Shield,
         Layout,
         FileText,
+        Smartphone,
+        Mail,
+        Fingerprint,
+        Route,
         Component: ComponentIcon
       })
     }

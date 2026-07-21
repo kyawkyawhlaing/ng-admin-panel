@@ -82,6 +82,15 @@ export const routes: Routes = [
           import('../features/admin/email-authentication/email-authentication').then(m => m.EmailAuthenticationComponent)
       },
       {
+        path: 'authentication-routes',
+        canActivate: [permissionGuard],
+        data: { permissions: ['sms_authentication_access'] },
+        loadComponent: () =>
+          import('../features/admin/authentication-routes/authentication-routes').then(
+            m => m.AuthenticationRoutesComponent
+          )
+      },
+      {
         path: 'profile',
         loadComponent: () => import('../features/admin/profile/profile').then(m => m.UserProfileComponent)
       },

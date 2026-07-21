@@ -191,10 +191,19 @@ export const ProfileStore = signalStore(
         }
       },
 
-      async updatePersonalDetails(id: string, payload: { first_name: string, last_name: string, display_name: string, email: string }) {
+      async updatePersonalDetails(id: string, payload: {
+        first_name: string;
+        last_name: string;
+        display_name: string;
+        email: string;
+        phone_number?: string | null;
+      }) {
         patchState(store, { isSaving: true, error: null, successMessage: null });
         try {
-          await lastValueFrom(http.put(`/users/${id}`, payload));
+          await lastValueFrom(http.put(`/users/${id}`, {
+            ...payload,
+            phone_number: payload.phone_number?.trim() || null
+          }));
           const updatedUser = await lastValueFrom(http.get<UsersTable>(`/users/${id}`));
           patchState(store, { userDetails: updatedUser, isSaving: false, successMessage: 'Personal details updated successfully!' });
           authStore.updateUser({

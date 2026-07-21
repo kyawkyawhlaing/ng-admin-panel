@@ -516,6 +516,20 @@ export class UsersComponent implements OnInit {
       for (const roleId of rolesToRemove) {
         await this.adminStore.removeRoleFromUser(userId, roleId);
       }
+
+      // Keep auth-store + JWT in sync when editing the signed-in user.
+      // Reissue access token (Bearer) — never call /refresh-token here (avoids 401 console noise).
+      if (userId === this.authStore.user()?.id) {
+        this.authStore.setRbacClaims(
+          this.adminStore.getRolesForUser(userId).map((r) => r.name),
+          this.adminStore.getPermissionCodesForUser(userId)
+        );
+        await this.authStore.reissueAccessToken();
+        this.authStore.setRbacClaims(
+          this.adminStore.getRolesForUser(userId).map((r) => r.name),
+          this.adminStore.getPermissionCodesForUser(userId)
+        );
+      }
     } catch (err) {
       console.error('Error assigning user roles:', err);
     }

@@ -1,6 +1,6 @@
 import { Component, computed, effect, inject, OnInit } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { DatePipe } from '@angular/common';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { MFA_OTP_LENGTH } from '../../../core/auth/mfa-otp.util';
 import {
@@ -8,23 +8,32 @@ import {
   KkhButtonComponent,
   KkhInputComponent,
   KkhSelectComponent,
+  KkhTextareaComponent,
   KkhAlertComponent,
   KkhSystemDefaultBadgeComponent
 } from '../../../shared/ui';
 import { SelectOption } from '../../../shared/data/list.types';
 import { SmsAuthenticationStore } from './sms-authentication-store';
+import { AuthChannelStatusPanelComponent } from '../authentication-shared/auth-channel-status-panel';
+import { formatAuthTemplatePreview, formatExpiryLabel, providerLabel } from '../authentication-shared/auth-channel.util';
+
+const SMS_PROVIDER_LABELS: Record<string, string> = {
+  twilio: 'Twilio',
+  custom_webhook: 'Custom webhook'
+};
 
 @Component({
   selector: 'app-sms-authentication',
   imports: [
     ReactiveFormsModule,
-    DatePipe,
     KkhPageHeaderComponent,
     KkhButtonComponent,
     KkhInputComponent,
     KkhSelectComponent,
+    KkhTextareaComponent,
     KkhAlertComponent,
-    KkhSystemDefaultBadgeComponent
+    KkhSystemDefaultBadgeComponent,
+    AuthChannelStatusPanelComponent
   ],
   providers: [SmsAuthenticationStore],
   template: `
@@ -32,89 +41,171 @@ import { SmsAuthenticationStore } from './sms-authentication-store';
       <kkh-page-header
         eyebrow="AUTHENTICATION"
         title="SMS Authentication"
-        description="Configure flexible SMS OTP delivery for console sign-in and verification flows."
+        description="Configure SMS OTP delivery, provider credentials, and message templates for configurable sign-in flows."
       >
         <kkh-system-default-badge />
       </kkh-page-header>
 
       @if (!canView()) {
-        <kkh-alert tone="danger">You need sms_authentication_view to load SMS authentication settings.</kkh-alert>
+        <kkh-alert tone="danger" title="Access denied">
+          You need <code class="font-mono text-xs">sms_authentication_view</code> to manage SMS settings.
+        </kkh-alert>
       } @else {
         @if (store.error()) {
-          <kkh-alert tone="danger">{{ store.error() }}</kkh-alert>
+          <kkh-alert tone="danger" [dismissible]="true" (dismissed)="store.clearMessages()">{{ store.error() }}</kkh-alert>
         }
         @if (store.successMessage()) {
-          <kkh-alert tone="success">{{ store.successMessage() }}</kkh-alert>
+          <kkh-alert tone="success" [dismissible]="true" (dismissed)="store.clearMessages()">{{ store.successMessage() }}</kkh-alert>
         }
 
         @if (store.isLoading()) {
-          <div class="kkh-panel p-8 text-sm text-[var(--kkh-muted)]">Loading SMS authentication settings…</div>
+          <div class="kkh-panel flex items-center justify-center gap-3 p-12 text-sm text-[var(--kkh-muted)]">
+            <div class="h-6 w-6 animate-spin border border-[var(--kkh-accent)] border-t-transparent" style="border-radius: 9999px"></div>
+            Loading SMS authentication settings…
+          </div>
         } @else {
-          <form [formGroup]="form" (ngSubmit)="onSubmit()" class="kkh-panel p-6 space-y-6 relative">
-            <div class="kkh-rail"></div>
-
-            <section class="space-y-4">
-              <h2 class="text-sm font-semibold text-[var(--kkh-text)]">Channel</h2>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <label class="flex items-center gap-3 text-sm text-[var(--kkh-text)]">
-                  <input type="checkbox" formControlName="is_enabled" class="h-4 w-4 accent-[var(--kkh-accent)]" [disabled]="!canEdit()" />
-                  Enable SMS OTP authentication
-                </label>
-                <kkh-select
-                  label="Provider"
-                  formControlName="provider"
-                  [options]="providerOptions"
-                  [error]="providerError()"
-                />
-              </div>
-            </section>
-
-            <section class="space-y-4 border-t border-[var(--kkh-border)] pt-6">
-              <h2 class="text-sm font-semibold text-[var(--kkh-text)]">Provider credentials</h2>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <kkh-input label="Account SID" formControlName="account_sid" placeholder="Twilio account SID" />
-                <kkh-input
-                  label="API key / auth token"
-                  type="password"
-                  formControlName="api_key_secret"
-                  [placeholder]="settings()?.has_api_key_secret ? 'Leave blank to keep existing secret' : 'Enter API key or auth token'"
-                />
-                <kkh-input label="From number" formControlName="from_number" placeholder="+15551234567" />
-                <kkh-input label="Webhook URL" formControlName="webhook_url" placeholder="https://example.com/sms/send" />
-              </div>
-            </section>
-
-            <section class="space-y-4 border-t border-[var(--kkh-border)] pt-6">
-              <h2 class="text-sm font-semibold text-[var(--kkh-text)]">OTP policy</h2>
-              <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <kkh-input label="OTP length" formControlName="otp_length" [hint]="'Fixed at ' + otpLength + ' digits'" />
-                <kkh-input label="Expiry (seconds)" type="number" formControlName="otp_expiry_seconds" />
-                <kkh-input label="Max attempts / hour" type="number" formControlName="max_attempts_per_hour" />
-              </div>
-              <kkh-input
-                label="Message template"
-                formControlName="message_template"
-                hint="Use {code} and {minutes} placeholders."
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <aside class="lg:col-span-1">
+              <auth-channel-status-panel
+                icon="smartphone"
+                channelLabel="Delivery channel"
+                title="SMS OTP"
+                [enabled]="form.controls.is_enabled.value"
+                [providerName]="providerDisplayName()"
+                [otpLength]="otpLength"
+                [otpExpirySeconds]="form.controls.otp_expiry_seconds.value"
+                [maxAttempts]="form.controls.max_attempts_per_hour.value"
+                [updatedAt]="settings()?.updated_at"
+                [updatedBy]="settings()?.updated_by"
               />
-            </section>
+            </aside>
 
-            @if (settings()?.updated_at) {
-              <p class="text-xs text-[var(--kkh-muted)]">
-                Last updated {{ settings()!.updated_at | date:'yyyy-MM-dd HH:mm' }}
-                @if (settings()?.updated_by) {
-                  by {{ settings()!.updated_by }}
-                }
-              </p>
-            }
+            <div class="lg:col-span-2">
+              <form [formGroup]="form" (ngSubmit)="onSubmit()" class="kkh-panel relative overflow-hidden">
+                <div class="kkh-rail"></div>
+                <div class="space-y-0 p-6 md:p-8">
+                  <section class="kkh-auth-section">
+                    <div class="kkh-auth-section__head">
+                      <h2 class="kkh-auth-section__title">Channel status</h2>
+                      <p class="kkh-auth-section__desc">
+                        When enabled, SMS OTP can be used for login and API endpoint step-up rules.
+                      </p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                      <label class="kkh-switch md:col-span-2">
+                        <input type="checkbox" formControlName="is_enabled" [disabled]="!canEdit()" />
+                        <span class="kkh-switch__track" aria-hidden="true"></span>
+                        <span class="kkh-switch__label">Enable SMS OTP authentication</span>
+                      </label>
+                      <kkh-select
+                        label="Provider"
+                        formControlName="provider"
+                        [options]="providerOptions"
+                        [error]="providerError()"
+                      />
+                    </div>
+                  </section>
 
-            @if (canEdit()) {
-              <div class="flex justify-end border-t border-[var(--kkh-border)] pt-4">
-                <kkh-button variant="primary" type="submit" [loading]="store.isSaving()" [disabled]="form.invalid || store.isSaving()">
-                  Save settings
-                </kkh-button>
-              </div>
-            }
-          </form>
+                  @if (isTwilio()) {
+                    <section class="kkh-auth-section">
+                      <div class="kkh-auth-section__head">
+                        <h2 class="kkh-auth-section__title">Twilio credentials</h2>
+                        <p class="kkh-auth-section__desc">
+                          Messages are sent through your Twilio account using the configured sender number.
+                        </p>
+                      </div>
+                      <div class="grid grid-cols-1 gap-5 md:grid-cols-2">
+                        <kkh-input label="Account SID" formControlName="account_sid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+                        <kkh-input
+                          label="Auth token"
+                          type="password"
+                          formControlName="api_key_secret"
+                          [placeholder]="settings()?.has_api_key_secret ? 'Leave blank to keep existing token' : 'Enter auth token'"
+                        />
+                        <kkh-input
+                          label="From number"
+                          formControlName="from_number"
+                          placeholder="+15551234567"
+                          hint="E.164 format recommended"
+                        />
+                      </div>
+                    </section>
+                  }
+
+                  @if (isWebhook()) {
+                    <section class="kkh-auth-section">
+                      <div class="kkh-auth-section__head">
+                        <h2 class="kkh-auth-section__title">Webhook delivery</h2>
+                        <p class="kkh-auth-section__desc">
+                          KyawHlaing POSTs the OTP payload to your endpoint. Implement delivery to the user device on your side.
+                        </p>
+                      </div>
+                      <kkh-input
+                        label="Webhook URL"
+                        formControlName="webhook_url"
+                        placeholder="https://api.example.com/sms/otp"
+                        hint="Must accept HTTPS POST requests from the API."
+                      />
+                    </section>
+                  }
+
+                  <section class="kkh-auth-section">
+                    <div class="kkh-auth-section__head">
+                      <h2 class="kkh-auth-section__title">OTP policy</h2>
+                      <p class="kkh-auth-section__desc">
+                        Codes are fixed at {{ otpLength }} digits. Expiry applies to each challenge session.
+                      </p>
+                    </div>
+                    <div class="grid grid-cols-1 gap-5 md:grid-cols-3">
+                      <kkh-input label="OTP length" formControlName="otp_length" [hint]="'Fixed at ' + otpLength + ' digits'" />
+                      <kkh-input
+                        label="Expiry (seconds)"
+                        type="number"
+                        formControlName="otp_expiry_seconds"
+                        [hint]="'≈ ' + expiryHint()"
+                      />
+                      <kkh-input label="Max attempts / hour" type="number" formControlName="max_attempts_per_hour" />
+                    </div>
+                  </section>
+
+                  <section class="kkh-auth-section">
+                    <div class="kkh-auth-section__head">
+                      <h2 class="kkh-auth-section__title">Message template</h2>
+                      <p class="kkh-auth-section__desc">
+                        Use <code class="font-mono text-xs">{{ codeToken }}</code> and <code class="font-mono text-xs">{{ minutesToken }}</code> placeholders.
+                      </p>
+                    </div>
+                    <kkh-textarea
+                      label="SMS body"
+                      formControlName="message_template"
+                      [rows]="4"
+                      [placeholder]="defaultMessagePlaceholder"
+                    />
+                    <div class="kkh-template-preview">
+                      <span class="kkh-template-preview__label">Preview</span>
+                      {{ messagePreview() }}
+                    </div>
+                  </section>
+
+                  @if (canEdit()) {
+                    <div class="flex flex-col gap-3 border-t border-[var(--kkh-border)] pt-6 sm:flex-row sm:items-center sm:justify-between">
+                      <p class="text-xs text-[var(--kkh-muted)]">
+                        Changes apply immediately to new OTP challenges.
+                      </p>
+                      <kkh-button
+                        variant="primary"
+                        type="submit"
+                        [loading]="store.isSaving()"
+                        [disabled]="form.invalid || store.isSaving() || !form.dirty"
+                      >
+                        Save SMS settings
+                      </kkh-button>
+                    </div>
+                  }
+                </div>
+              </form>
+            </div>
+          </div>
         }
       }
     </div>
@@ -125,6 +216,10 @@ export class SmsAuthenticationComponent implements OnInit {
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
   protected readonly otpLength = MFA_OTP_LENGTH;
+  protected readonly codeToken = '{code}';
+  protected readonly minutesToken = '{minutes}';
+  protected readonly defaultMessagePlaceholder =
+    'Your KyawHlaing verification code is {code}. Valid for {minutes} minutes.';
   protected readonly settings = computed(() => this.store.settings());
   protected readonly canView = computed(() => this.authStore.hasPermission('sms_authentication_view'));
   protected readonly canEdit = computed(() => this.authStore.hasPermission('sms_authentication_edit'));
@@ -142,31 +237,58 @@ export class SmsAuthenticationComponent implements OnInit {
     from_number: new FormControl('', { nonNullable: true }),
     webhook_url: new FormControl('', { nonNullable: true }),
     otp_length: new FormControl({ value: MFA_OTP_LENGTH, disabled: true }, { nonNullable: true }),
-    otp_expiry_seconds: new FormControl(300, { nonNullable: true, validators: [Validators.required, Validators.min(60), Validators.max(3600)] }),
-    max_attempts_per_hour: new FormControl(5, { nonNullable: true, validators: [Validators.required, Validators.min(1), Validators.max(100)] }),
-    message_template: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.maxLength(512)] })
+    otp_expiry_seconds: new FormControl(300, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(60), Validators.max(3600)]
+    }),
+    max_attempts_per_hour: new FormControl(5, {
+      nonNullable: true,
+      validators: [Validators.required, Validators.min(1), Validators.max(100)]
+    }),
+    message_template: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(512)]
+    })
+  });
+
+  private readonly providerValue = toSignal(this.form.controls.provider.valueChanges, {
+    initialValue: this.form.controls.provider.value
+  });
+
+  private readonly messageTemplateValue = toSignal(this.form.controls.message_template.valueChanges, {
+    initialValue: this.form.controls.message_template.value
+  });
+
+  private readonly expiryValue = toSignal(this.form.controls.otp_expiry_seconds.valueChanges, {
+    initialValue: this.form.controls.otp_expiry_seconds.value
   });
 
   constructor() {
     effect(() => {
       const settings = this.store.settings();
       if (!settings) return;
-      this.form.patchValue({
-        is_enabled: settings.is_enabled,
-        provider: settings.provider,
-        account_sid: settings.account_sid ?? '',
-        from_number: settings.from_number ?? '',
-        webhook_url: settings.webhook_url ?? '',
-        otp_expiry_seconds: settings.otp_expiry_seconds,
-        max_attempts_per_hour: settings.max_attempts_per_hour,
-        message_template: settings.message_template
-      });
-      if (!this.canEdit()) {
-        this.form.disable({ emitEvent: false });
-      } else {
-        this.form.enable({ emitEvent: false });
-        this.form.controls.otp_length.disable({ emitEvent: false });
-      }
+
+      this.form.patchValue(
+        {
+          is_enabled: settings.is_enabled,
+          provider: settings.provider,
+          account_sid: settings.account_sid ?? '',
+          from_number: settings.from_number ?? '',
+          webhook_url: settings.webhook_url ?? '',
+          otp_expiry_seconds: settings.otp_expiry_seconds,
+          max_attempts_per_hour: settings.max_attempts_per_hour,
+          message_template: settings.message_template
+        },
+        { emitEvent: false }
+      );
+
+      this.applyEditState();
+      this.form.markAsPristine();
+    });
+
+    effect(() => {
+      this.canEdit();
+      this.applyEditState();
     });
   }
 
@@ -174,6 +296,28 @@ export class SmsAuthenticationComponent implements OnInit {
     if (this.canView()) {
       void this.store.loadSettings();
     }
+  }
+
+  protected isTwilio(): boolean {
+    return this.providerValue() === 'twilio';
+  }
+
+  protected isWebhook(): boolean {
+    return this.providerValue() === 'custom_webhook';
+  }
+
+  protected providerDisplayName(): string {
+    return providerLabel(this.providerValue(), SMS_PROVIDER_LABELS);
+  }
+
+  protected messagePreview(): string {
+    const template = this.messageTemplateValue() || 'Your verification code is {code}.';
+    const minutes = Math.max(1, Math.round((this.expiryValue() ?? 300) / 60));
+    return formatAuthTemplatePreview(template, '1'.repeat(MFA_OTP_LENGTH), minutes);
+  }
+
+  protected expiryHint(): string {
+    return formatExpiryLabel(this.expiryValue() ?? 300);
   }
 
   protected providerError(): string | null {
@@ -207,6 +351,17 @@ export class SmsAuthenticationComponent implements OnInit {
     const ok = await this.store.saveSettings(payload);
     if (ok) {
       this.form.controls.api_key_secret.reset('');
+      this.form.markAsPristine();
     }
+  }
+
+  private applyEditState(): void {
+    if (!this.canEdit()) {
+      this.form.disable({ emitEvent: false });
+      return;
+    }
+
+    this.form.enable({ emitEvent: false });
+    this.form.controls.otp_length.disable({ emitEvent: false });
   }
 }

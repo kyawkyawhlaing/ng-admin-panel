@@ -3,10 +3,11 @@ import { RouterOutlet } from '@angular/router';
 import { ThemeStore } from '../core/stores/theme-store';
 import { KkhToastHostComponent } from '../shared/ui/kkh-toast-host';
 import { KkhNavProgressComponent } from '../shared/ui/kkh-nav-progress';
+import { StepUpAuthDialogComponent } from '../core/auth/step-up-auth-dialog';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, KkhToastHostComponent, KkhNavProgressComponent],
+  imports: [RouterOutlet, KkhToastHostComponent, KkhNavProgressComponent, StepUpAuthDialogComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })

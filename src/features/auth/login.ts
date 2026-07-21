@@ -5,8 +5,12 @@ import { AuthStore, AuthStoreType } from '../../core/stores/auth-store';
 import { ThemeStore } from '../../core/stores/theme-store';
 import {
   MFA_ACCESS_CODE_FORMAT_HINT,
+  MFA_OTP_FORMAT_HINT,
+  MFA_OTP_LENGTH,
   mfaAccessCodeValidator,
-  mfaOtpErrorMessage
+  mfaOtpErrorMessage,
+  normalizeMfaOtpInput,
+  isValidMfaOtp
 } from '../../core/auth/mfa-otp.util';
 import {
   KkhAlertComponent,
@@ -45,14 +49,14 @@ import {
             <p class="kkh-label text-[var(--kkh-accent)]">Identity Console</p>
             <h1 class="kkh-title mt-3 text-4xl sm:text-5xl text-[var(--kkh-text)] tracking-[0.12em]">KyawHlaing</h1>
             <p class="mt-3 font-mono text-xs tracking-[0.14em] uppercase text-[var(--kkh-muted)]">
-              {{ mfaStep() ? 'Second factor required' : 'Secure access required' }}
+              {{ secondaryStep() ? 'Second factor required' : 'Secure access required' }}
             </p>
           </div>
 
           <div class="kkh-panel kkh-panel--framed relative overflow-hidden">
             <div class="kkh-rail"></div>
 
-            @if (!mfaStep()) {
+            @if (!secondaryStep()) {
               <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" class="flex flex-col gap-5 px-6 py-7 sm:px-8 sm:py-8">
                 @if (errorMessage(); as err) {
                   <kkh-alert tone="danger">{{ err }}</kkh-alert>
@@ -92,7 +96,7 @@ import {
                   </kkh-button>
                 </div>
               </form>
-            } @else {
+            } @else if (mfaStep()) {
               <form [formGroup]="mfaForm" (ngSubmit)="onMfaSubmit()" class="flex flex-col gap-5 px-6 py-7 sm:px-8 sm:py-8">
                 @if (errorMessage(); as err) {
                   <kkh-alert tone="danger">{{ err }}</kkh-alert>
@@ -120,15 +124,99 @@ import {
                   <kkh-button variant="primary" type="submit" [fullWidth]="true" [loading]="isLoading()" [disabled]="isLoading()">
                     {{ isLoading() ? 'Verifying…' : 'Verify' }}
                   </kkh-button>
-                  <kkh-button variant="ghost" type="button" [fullWidth]="true" [disabled]="isLoading()" (pressed)="onCancelMfa()">
+                  <kkh-button variant="ghost" type="button" [fullWidth]="true" [disabled]="isLoading()" (pressed)="onCancelSecondary()">
                     Back to sign in
                   </kkh-button>
                 </div>
               </form>
+            } @else {
+              <div class="flex flex-col gap-5 px-6 py-7 sm:px-8 sm:py-8">
+                @if (errorMessage(); as err) {
+                  <kkh-alert tone="danger">{{ err }}</kkh-alert>
+                }
+
+                @if (!otpCodeStep()) {
+                  <p class="text-sm text-[var(--kkh-muted)]">
+                    Choose how to receive a one-time login code.
+                  </p>
+
+                  <div class="flex flex-wrap gap-2">
+                    @for (method of otpMethods(); track method) {
+                      <button
+                        type="button"
+                        class="kkh-btn"
+                        [class.border-[var(--kkh-accent)]]="selectedOtpMethod() === method"
+                        [class.text-[var(--kkh-accent)]]="selectedOtpMethod() === method"
+                        (click)="onSelectOtpMethod(method)"
+                      >
+                        {{ methodLabel(method) }}
+                      </button>
+                    }
+                  </div>
+
+                  <kkh-input
+                    [label]="otpDestinationLabel()"
+                    [placeholder]="otpDestinationPlaceholder()"
+                    [formControl]="otpDestination"
+                    hint="Leave blank to use the phone/email on your profile."
+                  />
+
+                  <div class="flex flex-col gap-3 pt-1">
+                    <kkh-button
+                      variant="primary"
+                      type="button"
+                      [fullWidth]="true"
+                      [loading]="isLoading()"
+                      [disabled]="isLoading() || !selectedOtpMethod()"
+                      (pressed)="onSendOtp()"
+                    >
+                      Send code
+                    </kkh-button>
+                    <kkh-button variant="ghost" type="button" [fullWidth]="true" [disabled]="isLoading()" (pressed)="onCancelSecondary()">
+                      Back to sign in
+                    </kkh-button>
+                  </div>
+                } @else {
+                  <form [formGroup]="otpForm" (ngSubmit)="onOtpSubmit()" class="flex flex-col gap-5">
+                    <p class="text-sm text-[var(--kkh-muted)]">
+                      Enter the {{ otpLength }}-digit code sent via {{ methodLabel(selectedOtpMethod() || '') }}.
+                    </p>
+
+                    @if (isLoading()) {
+                      <kkh-progress [indeterminate]="true" label="Verifying one-time code" />
+                    }
+
+                    <kkh-input
+                      label="Verification code"
+                      icon="lock"
+                      type="text"
+                      autocomplete="one-time-code"
+                      inputMode="numeric"
+                      [otpMode]="true"
+                      [maxLength]="otpLength"
+                      [hint]="otpHint"
+                      formControlName="code"
+                      [error]="otpCodeError()"
+                    />
+
+                    <div class="flex flex-col gap-3 pt-1">
+                      <kkh-button variant="primary" type="submit" [fullWidth]="true" [loading]="isLoading()" [disabled]="isLoading() || !otpCodeValid()">
+                        {{ isLoading() ? 'Verifying…' : 'Verify' }}
+                      </kkh-button>
+                      <kkh-button variant="ghost" type="button" [fullWidth]="true" [disabled]="isLoading()" (pressed)="onResendOtp()">
+                        Resend code
+                      </kkh-button>
+                      <kkh-button variant="ghost" type="button" [fullWidth]="true" [disabled]="isLoading()" (pressed)="onCancelSecondary()">
+                        Back to sign in
+                      </kkh-button>
+                    </div>
+                  </form>
+                }
+              </div>
             }
           </div>
 
-          @if (!mfaStep()) {
+          @if (!secondaryStep()) {
             <p class="mt-6 text-center text-sm text-[var(--kkh-muted)]">
               Need an account?
               <a routerLink="/register" class="text-[var(--kkh-accent)] font-medium hover:underline ml-1">Register</a>
@@ -144,10 +232,17 @@ export class LoginComponent {
   private readonly authStore = inject(AuthStore) as unknown as AuthStoreType;
 
   protected readonly MFA_ACCESS_CODE_FORMAT_HINT = MFA_ACCESS_CODE_FORMAT_HINT;
+  protected readonly otpLength = MFA_OTP_LENGTH;
+  protected readonly otpHint = MFA_OTP_FORMAT_HINT.replace('authenticator app', 'SMS or email');
 
   protected readonly isLoading = computed(() => this.authStore.isLoading());
   protected readonly errorMessage = computed(() => this.authStore.error());
   protected readonly mfaStep = computed(() => this.authStore.isMfaPending());
+  protected readonly otpStep = computed(() => this.authStore.isOtpChallengePending());
+  protected readonly secondaryStep = computed(() => this.mfaStep() || this.otpStep());
+  protected readonly otpCodeStep = computed(() => !!this.authStore.loginChallengeToken());
+  protected readonly otpMethods = computed(() => this.authStore.loginRequiredMethods());
+  protected readonly selectedOtpMethod = computed(() => this.authStore.loginSelectedMethod());
 
   protected readonly loginForm = new FormGroup({
     email: new FormControl('', {
@@ -167,8 +262,51 @@ export class LoginComponent {
     })
   });
 
+  protected readonly otpForm = new FormGroup({
+    code: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required]
+    })
+  });
+
+  protected readonly otpDestination = new FormControl('', { nonNullable: true });
+
   protected mfaCodeError(): string | null {
     return mfaOtpErrorMessage(this.mfaForm.controls.code, { accessCode: true });
+  }
+
+  protected otpCodeError(): string | null {
+    const control = this.otpForm.controls.code;
+    if (!control.touched || !control.value) {
+      return null;
+    }
+    return isValidMfaOtp(control.value) ? null : 'Enter a valid 6-digit code';
+  }
+
+  protected otpCodeValid(): boolean {
+    return isValidMfaOtp(this.otpForm.controls.code.value);
+  }
+
+  protected methodLabel(method: string): string {
+    if (method === 'sms') {
+      return 'SMS';
+    }
+    if (method === 'email') {
+      return 'Email';
+    }
+    return method;
+  }
+
+  protected otpDestinationLabel(): string {
+    return this.selectedOtpMethod() === 'sms' ? 'Phone number (optional)' : 'Email override (optional)';
+  }
+
+  protected otpDestinationPlaceholder(): string {
+    return this.selectedOtpMethod() === 'sms' ? '+959123456789' : 'you@example.com';
+  }
+
+  protected onSelectOtpMethod(method: string): void {
+    this.authStore.setLoginChallengeMethod(method);
   }
 
   protected async onSubmit(): Promise<void> {
@@ -203,8 +341,42 @@ export class LoginComponent {
     }
   }
 
-  protected onCancelMfa(): void {
+  protected async onSendOtp(): Promise<void> {
+    this.authStore.setError(null);
+    try {
+      await this.authStore.sendLoginOtpChallenge(this.otpDestination.value);
+    } catch {
+      // Error message is set on AuthStore.
+    }
+  }
+
+  protected async onResendOtp(): Promise<void> {
+    this.otpForm.reset();
+    await this.onSendOtp();
+  }
+
+  protected async onOtpSubmit(): Promise<void> {
+    const raw = this.otpForm.controls.code.value;
+    const code = normalizeMfaOtpInput(raw);
+    this.otpForm.controls.code.setValue(code);
+    this.otpForm.controls.code.markAsTouched();
+
+    if (!isValidMfaOtp(code)) {
+      return;
+    }
+
+    this.authStore.setError(null);
+    try {
+      await this.authStore.completeLoginOtpChallenge(code);
+    } catch {
+      // Error message is set on AuthStore.
+    }
+  }
+
+  protected onCancelSecondary(): void {
     this.mfaForm.reset();
+    this.otpForm.reset();
+    this.otpDestination.reset();
     this.authStore.cancelMfaChallenge();
   }
 }

@@ -70,7 +70,10 @@ function handle401(
       switchMap((newToken) => {
         if (!newToken) {
           refreshGate$.next('');
-          void router.navigateByUrl('/login');
+          // Only force login when the session was actually cleared (hard refresh failure).
+          if (!authStore.token()) {
+            void router.navigateByUrl('/login');
+          }
           return throwError(() => new HttpErrorResponse({
             status: 401,
             statusText: 'Session expired',

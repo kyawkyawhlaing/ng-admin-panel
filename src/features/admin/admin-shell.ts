@@ -14,6 +14,10 @@ import {
   Database,
   Layout,
   FileText,
+  Smartphone,
+  Mail,
+  Fingerprint,
+  Route,
   Component as ComponentIcon
 } from 'lucide-angular';
 import { AuthStore, AuthStoreType } from '../../core/stores/auth-store';
@@ -45,6 +49,10 @@ import { KkhButtonComponent } from '../../shared/ui';
         Database,
         Layout,
         FileText,
+        Smartphone,
+        Mail,
+        Fingerprint,
+        Route,
         Component: ComponentIcon
       })
     }

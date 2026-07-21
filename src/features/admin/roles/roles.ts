@@ -450,10 +450,7 @@ export class RolesComponent implements OnInit {
           await this.adminStore.assignPermissionToRole(roleId, permissionId);
         }
         await this.adminStore.loadRealData();
-        const userId = this.authStore.user()?.id;
-        if (userId && this.adminStore.userRoles().some((ur) => ur.userId === userId && ur.roleId === roleId)) {
-          await this.authStore.refreshSession();
-        }
+        await this.syncSessionIfCurrentUserHasRole(roleId);
       } catch (err) {
         console.error('Error configuring permissions:', err);
         await this.adminStore.loadRealData();
@@ -493,15 +490,30 @@ export class RolesComponent implements OnInit {
       }
 
       await this.adminStore.loadRealData();
-
-      const userId = this.authStore.user()?.id;
-      if (userId && this.adminStore.userRoles().some((ur) => ur.userId === userId && ur.roleId === roleId)) {
-        await this.authStore.refreshSession();
-      }
+      await this.syncSessionIfCurrentUserHasRole(roleId);
     } catch (err) {
       console.error('Error configuring permissions:', err);
       await this.adminStore.loadRealData();
     }
+  }
+
+  private async syncSessionIfCurrentUserHasRole(roleId: string): Promise<void> {
+    const userId = this.authStore.user()?.id;
+    if (!userId) return;
+    const hasRole = this.adminStore
+      .userRoles()
+      .some((ur) => ur.userId === userId && String(ur.roleId) === String(roleId));
+    if (!hasRole) return;
+
+    this.authStore.setRbacClaims(
+      this.adminStore.getRolesForUser(userId).map((r) => r.name),
+      this.adminStore.getPermissionCodesForUser(userId)
+    );
+    await this.authStore.reissueAccessToken();
+    this.authStore.setRbacClaims(
+      this.adminStore.getRolesForUser(userId).map((r) => r.name),
+      this.adminStore.getPermissionCodesForUser(userId)
+    );
   }
 
   protected openCreateModal(role?: RolesTable): void {

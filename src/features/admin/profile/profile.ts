@@ -107,6 +107,12 @@ type Tab = 'personal' | 'security' | 'preferences';
                       <kkh-input label="Last Name" formControlName="last_name" />
                       <kkh-input label="Display Name" formControlName="display_name" />
                       <kkh-input label="Email" type="email" formControlName="email" />
+                      <kkh-input
+                        label="Phone number"
+                        formControlName="phone_number"
+                        placeholder="+959123456789"
+                        hint="Used for SMS OTP on protected endpoints."
+                      />
                     </div>
                     <div class="flex justify-end pt-4 border-t border-[var(--kkh-border)]">
                       <kkh-button
@@ -363,7 +369,8 @@ export class UserProfileComponent implements OnInit {
       first_name: ['', Validators.required],
       last_name: ['', Validators.required],
       display_name: ['', Validators.required],
-      email: ['', [Validators.required, Validators.email]]
+      email: ['', [Validators.required, Validators.email]],
+      phone_number: ['']
     });
 
     this.securityForm = this.fb.group({
@@ -398,7 +405,8 @@ export class UserProfileComponent implements OnInit {
           first_name: details.first_name,
           last_name: details.last_name,
           display_name: details.display_name,
-          email: details.email
+          email: details.email,
+          phone_number: details.phone_number ?? ''
         });
 
         if (details.preferences) {
