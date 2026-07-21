@@ -62,6 +62,12 @@ export const routes: Routes = [
         loadComponent: () => import('../features/admin/navigation/navigation').then(m => m.NavigationComponent)
       },
       {
+        path: 'resources',
+        canActivate: [permissionGuard],
+        data: { permissions: ['resources_access'] },
+        loadComponent: () => import('../features/admin/resources/resources').then(m => m.ResourcesComponent)
+      },
+      {
         path: 'profile',
         loadComponent: () => import('../features/admin/profile/profile').then(m => m.UserProfileComponent)
       },

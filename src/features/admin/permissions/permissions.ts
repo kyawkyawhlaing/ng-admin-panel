@@ -15,10 +15,12 @@ import {
   KkhDataTableComponent,
   KkhCellDefDirective,
   KkhDialogComponent,
-  KkhColumnDef
+  KkhColumnDef,
+  KkhSystemDefaultBadgeComponent
 } from '../../../shared/ui';
 import { PermissionsTable, ActionStatus } from '../../../types/database';
 import { isProtectedPermission } from '../../../core/auth/system-defaults.util';
+import { normalizeResourceName } from '../../../core/auth/resource-naming.util';
 import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } from 'lucide-angular';
 
 @Component({
@@ -35,6 +37,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
     KkhDataTableComponent,
     KkhCellDefDirective,
     KkhDialogComponent,
+    KkhSystemDefaultBadgeComponent,
     LucideAngularModule
   ],
   providers: [
@@ -113,7 +116,10 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
 
         <ng-template kkhCell="actions" let-row>
           <div class="flex items-center justify-end gap-3">
-            @if (canEdit()) {
+            @if (isProtectedPermissionRow(row)) {
+              <kkh-system-default-badge />
+            }
+            @if (canEdit() && !isProtectedPermissionRow(row)) {
               <button
                 type="button"
                 (click)="openCreateModal(row)"
@@ -145,11 +151,13 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
       (closed)="onModalClose()"
     >
       <form id="permission-form" [formGroup]="permissionForm" (ngSubmit)="onCreateSubmit()" class="kkh-dialog__form">
-        <kkh-input
-          label="Permission Name"
-          formControlName="name"
-          placeholder="e.g. users_access"
-          [error]="permissionForm.get('name')?.hasError('required') && permissionForm.get('name')?.touched ? 'Permission name is required' : null"
+        <kkh-combo-box
+          label="Resource"
+          formControlName="resource"
+          placeholder="Select a resource..."
+          endpoint="/navigation/resources/list"
+          [mapItem]="resourceMapItem"
+          [error]="permissionForm.get('resource')?.hasError('required') && permissionForm.get('resource')?.touched ? 'Resource is required' : null"
         />
 
         <kkh-combo-box
@@ -161,13 +169,12 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
           [error]="permissionForm.get('action')?.hasError('required') && permissionForm.get('action')?.touched ? 'Action type is required' : null"
         />
 
-        <kkh-combo-box
-          label="Resource"
-          formControlName="resource"
-          placeholder="Select a resource..."
-          endpoint="/navigation/resources/list"
-          [mapItem]="resourceMapItem"
-          [error]="permissionForm.get('resource')?.hasError('required') && permissionForm.get('resource')?.touched ? 'Resource is required' : null"
+        <kkh-input
+          label="Permission Name"
+          formControlName="name"
+          placeholder="Auto-filled from resource + action"
+          hint="Generated as {resource}_{action}"
+          [error]="permissionForm.get('name')?.hasError('required') && permissionForm.get('name')?.touched ? 'Permission name is required' : null"
         />
 
         <kkh-textarea
@@ -234,7 +241,7 @@ export class PermissionsComponent implements OnInit {
   });
 
   protected readonly permissionForm = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
+    name: new FormControl({ value: '', disabled: true }, { nonNullable: true, validators: [Validators.required] }),
     action: new FormControl<ActionStatus>('access', { nonNullable: true, validators: [Validators.required] }),
     resource: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] }),
     description: new FormControl<string>('', { nonNullable: true, validators: [Validators.required] })
@@ -246,16 +253,16 @@ export class PermissionsComponent implements OnInit {
       this.permissionForm.controls.resource.valueChanges
     )
       .pipe(takeUntilDestroyed())
-      .subscribe(() => {
-        const action = this.permissionForm.controls.action.value;
-        const resource = this.permissionForm.controls.resource.value;
-        if (action && resource) {
-          const expectedName = `${resource}_${action}`;
-          if (this.permissionForm.controls.name.value !== expectedName) {
-            this.permissionForm.controls.name.setValue(expectedName);
-          }
-        }
-      });
+      .subscribe(() => this.syncPermissionName());
+  }
+
+  private syncPermissionName(): void {
+    const action = this.permissionForm.controls.action.value;
+    const resource = this.permissionForm.controls.resource.value;
+    const expectedName = action && resource ? `${resource}_${action}` : '';
+    if (this.permissionForm.controls.name.value !== expectedName) {
+      this.permissionForm.controls.name.setValue(expectedName, { emitEvent: false });
+    }
   }
 
   ngOnInit() {
@@ -277,6 +284,9 @@ export class PermissionsComponent implements OnInit {
   }
 
   protected openCreateModal(permission?: PermissionsTable): void {
+    if (permission && this.isProtectedPermissionRow(permission)) {
+      return;
+    }
     if (permission) {
       this.editingPermissionId.set(permission.id);
       this.permissionForm.reset({
@@ -289,6 +299,8 @@ export class PermissionsComponent implements OnInit {
       this.editingPermissionId.set(null);
       this.permissionForm.reset({ name: '', action: 'access', resource: '', description: '' });
     }
+    this.permissionForm.controls.name.disable({ emitEvent: false });
+    this.syncPermissionName();
     this.isCreateOpen.set(true);
   }
 
@@ -297,7 +309,9 @@ export class PermissionsComponent implements OnInit {
   }
 
   protected onModalClose(): void {
-    this.permissionForm.reset();
+    this.permissionForm.reset({ name: '', action: 'access', resource: '', description: '' });
+    this.permissionForm.controls.name.disable({ emitEvent: false });
+    this.editingPermissionId.set(null);
     this.isCreateOpen.set(false);
   }
 
@@ -308,20 +322,21 @@ export class PermissionsComponent implements OnInit {
     }
 
     const formVal = this.permissionForm.getRawValue();
+    const resource = normalizeResourceName(formVal.resource);
     const editId = this.editingPermissionId();
 
     if (editId) {
       this.permissionsStore.editPermission(editId, {
-        name: formVal.name,
+        name: `${resource}_${formVal.action}`,
         action: formVal.action,
-        resource: formVal.resource || null,
+        resource: resource || null,
         description: formVal.description
       });
     } else {
       this.permissionsStore.addPermission({
-        name: formVal.name,
+        name: `${resource}_${formVal.action}`,
         action: formVal.action,
-        resource: formVal.resource || null,
+        resource: resource || null,
         description: formVal.description
       });
     }

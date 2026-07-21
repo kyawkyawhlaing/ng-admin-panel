@@ -23,13 +23,19 @@ export class ListDataSource {
     endpoint: string,
     searchTerm: string,
     mapItem: (item: any) => { value: string; label: string; description?: string },
-    pageSize = 20
+    pageSize = 20,
+    extra: Partial<ListQuery> = {}
   ): Promise<Array<{ value: string; label: string; description?: string }>> {
     const result = await this.fetch<any>(endpoint, {
       searchTerm: searchTerm || null,
       pageNumber: 1,
-      pageSize
+      pageSize,
+      ...extra
     });
-    return result.items.map(mapItem);
+    let items = result.items;
+    if (extra['exclude_system_defaults'] === true) {
+      items = items.filter((item: { system_default?: boolean }) => !item.system_default);
+    }
+    return items.map(mapItem);
   }
 }

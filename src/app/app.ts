@@ -2,10 +2,11 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { ThemeStore } from '../core/stores/theme-store';
 import { KkhToastHostComponent } from '../shared/ui/kkh-toast-host';
+import { KkhNavProgressComponent } from '../shared/ui/kkh-nav-progress';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, KkhToastHostComponent],
+  imports: [RouterOutlet, KkhToastHostComponent, KkhNavProgressComponent],
   templateUrl: './app.html',
   styleUrl: './app.css'
 })

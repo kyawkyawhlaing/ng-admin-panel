@@ -14,3 +14,5 @@ export * from './kkh-data-table';
 export * from './toast.service';
 export * from './kkh-toast-host';
 export * from './kkh-progress';
+export * from './kkh-nav-progress';
+export * from './kkh-system-default-badge';

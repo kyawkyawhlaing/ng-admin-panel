@@ -1,11 +1,20 @@
 import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, FormGroup, FormsModule, ReactiveFormsModule, ValidationErrors, AbstractControl, Validators } from '@angular/forms';
 import { AdminStore, AdminStoreType } from '../admin-store';
 import { RolesStore } from './roles-store';
 import { AuthStore, AuthStoreType } from '../../../core/stores/auth-store';
 import { isAccessAction, normalizeRolePermissionIds } from '../../../core/auth/permission.util';
 import { isSysAdminRole } from '../../../core/auth/system-defaults.util';
+import {
+  isValidCustomRoleName,
+  ensureRoleNamePrefix,
+  normalizeRoleName,
+  roleNameFromSuffix,
+  roleNameSuffix,
+  ROLE_NAME_FORMAT_HINT,
+  ROLE_NAME_PREFIX
+} from '../../../core/auth/role-naming.util';
 import {
   KkhPageHeaderComponent,
   KkhButtonComponent,
@@ -15,10 +24,34 @@ import {
   KkhCellDefDirective,
   KkhTransferComponent,
   KkhDialogComponent,
-  KkhColumnDef
+  KkhColumnDef,
+  KkhSystemDefaultBadgeComponent
 } from '../../../shared/ui';
 import { RolesTable } from '../../../types/database';
 import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } from 'lucide-angular';
+
+function roleNameFormatValidator(control: AbstractControl): ValidationErrors | null {
+  const raw = (control.value ?? '').toString();
+  if (!raw.trim()) {
+    return null;
+  }
+  const normalized = ensureRoleNamePrefix(raw);
+  if (isSysAdminRole(normalized) || isValidCustomRoleName(normalized)) {
+    return null;
+  }
+  return { roleNameFormat: true };
+}
+
+function roleSuffixValidator(control: AbstractControl): ValidationErrors | null {
+  const suffix = normalizeRoleName(control.value).replace(/^ROLE_/, '');
+  if (!suffix) {
+    return { required: true };
+  }
+  if (!/^[A-Z0-9]+(?:_[A-Z0-9]+)*$/.test(suffix)) {
+    return { roleNameFormat: true };
+  }
+  return null;
+}
 
 @Component({
   selector: 'app-admin-roles',
@@ -33,6 +66,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
     KkhCellDefDirective,
     KkhTransferComponent,
     KkhDialogComponent,
+    KkhSystemDefaultBadgeComponent,
     LucideAngularModule
   ],
   providers: [
@@ -106,16 +140,16 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
             type="button"
             class="kkh-relation-summary"
             [class.kkh-relation-summary--empty]="count === 0"
-            [disabled]="!canEdit()"
-            (click)="canEdit() && openAssignDialog(row.id.toString())"
-            [attr.aria-label]="count === 0 ? 'Assign permissions' : 'Manage ' + count + ' permissions'"
-            [title]="count === 0 ? 'Assign permissions' : count + ' permissions mapped — click to manage'"
+            [disabled]="!canEdit() || isProtectedRole(row)"
+            (click)="canEdit() && !isProtectedRole(row) && openAssignDialog(row.id.toString())"
+            [attr.aria-label]="isProtectedRole(row) ? 'System role permissions are locked' : (count === 0 ? 'Assign permissions' : 'Manage ' + count + ' permissions')"
+            [title]="isProtectedRole(row) ? 'sysadmin permissions cannot be edited' : (count === 0 ? 'Assign permissions' : count + ' permissions mapped — click to manage')"
           >
             <span class="kkh-relation-summary__count">
               <span class="kkh-relation-summary__label">
                 {{ count === 0 ? 'None mapped' : count + (count === 1 ? ' permission' : ' permissions') }}
               </span>
-              @if (canEdit()) {
+              @if (canEdit() && !isProtectedRole(row)) {
                 <span class="kkh-relation-summary__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 20h9" />
@@ -129,7 +163,10 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
 
         <ng-template kkhCell="actions" let-row>
           <div class="flex items-center justify-end gap-3">
-            @if (canEdit()) {
+            @if (isProtectedRole(row)) {
+              <kkh-system-default-badge />
+            }
+            @if (canEdit() && !isProtectedRole(row)) {
               <button
                 type="button"
                 (click)="openCreateModal(row)"
@@ -173,19 +210,50 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Edit, Trash2 } f
       (closed)="onModalClose()"
     >
       <form id="role-form" [formGroup]="roleForm" (ngSubmit)="onCreateSubmit()" class="kkh-dialog__form">
-        <kkh-input
-          label="Role Name"
-          formControlName="name"
-          placeholder="e.g. Admin"
-          [error]="roleForm.get('name')?.hasError('required') && roleForm.get('name')?.touched ? 'Role name is required' : null"
-        />
+        <p class="text-xs text-[var(--kkh-muted)] -mt-1 mb-1">
+          {{ ROLE_NAME_FORMAT_HINT }}
+        </p>
 
-        <kkh-input
-          label="Normalized Name"
-          formControlName="normalized_name"
-          placeholder="e.g. ADMIN"
-          [error]="roleForm.get('normalized_name')?.hasError('required') && roleForm.get('normalized_name')?.touched ? 'Normalized name is required' : null"
-        />
+        @if (isEditingProtectedRole()) {
+          <kkh-input
+            label="Role Name"
+            formControlName="name"
+            [error]="null"
+          />
+          <kkh-input
+            label="Normalized Name"
+            formControlName="normalized_name"
+            [error]="null"
+          />
+        } @else {
+          <label class="kkh-field flex flex-col gap-2 w-full">
+            <span class="kkh-field-label">Role Name</span>
+            <div
+              class="kkh-input-shell flex items-stretch overflow-hidden"
+              [class.opacity-60]="roleForm.disabled"
+            >
+              <span
+                class="inline-flex shrink-0 items-center border-r border-[var(--kkh-border)] bg-[var(--kkh-raised)] px-3 font-mono text-xs font-semibold tracking-wider text-[var(--kkh-accent)] select-none"
+                title="Prefix is required and cannot be removed"
+              >{{ ROLE_NAME_PREFIX }}</span>
+              <input
+                class="kkh-input !border-0 !shadow-none flex-1 min-w-0"
+                type="text"
+                autocomplete="off"
+                placeholder="EDITOR"
+                formControlName="nameSuffix"
+                (blur)="onSuffixBlur()"
+              />
+            </div>
+            @if (roleSuffixError(); as err) {
+              <span class="text-xs text-[var(--kkh-danger)] leading-snug">{{ err }}</span>
+            } @else {
+              <span class="text-xs text-[var(--kkh-muted)] font-mono tracking-wide">
+                Full name: {{ fullRoleNamePreview() }}
+              </span>
+            }
+          </label>
+        }
       </form>
       <div footer class="contents">
         <kkh-button variant="ghost" type="button" (pressed)="closeCreateModal()">Cancel</kkh-button>
@@ -262,20 +330,67 @@ export class RolesComponent implements OnInit {
       .map(rp => String(rp.permissionId));
   });
 
+  protected readonly ROLE_NAME_FORMAT_HINT = ROLE_NAME_FORMAT_HINT;
+  protected readonly ROLE_NAME_PREFIX = ROLE_NAME_PREFIX;
+
   protected readonly roleForm = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    normalized_name: new FormControl('', { nonNullable: true, validators: [Validators.required] })
+    name: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, roleNameFormatValidator]
+    }),
+    normalized_name: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, roleNameFormatValidator]
+    }),
+    nameSuffix: new FormControl('', {
+      nonNullable: true,
+      validators: [roleSuffixValidator]
+    })
   });
 
   constructor() {
-    this.roleForm.controls.name.valueChanges
+    this.roleForm.controls.nameSuffix.valueChanges
       .pipe(takeUntilDestroyed())
-      .subscribe(nameValue => {
-        const uppercaseName = (nameValue || '').toUpperCase();
-        if (this.roleForm.controls.normalized_name.value !== uppercaseName) {
-          this.roleForm.controls.normalized_name.setValue(uppercaseName);
+      .subscribe((suffixValue) => {
+        const cleaned = normalizeRoleName(suffixValue).replace(/^ROLE_/, '');
+        if (suffixValue !== cleaned) {
+          this.roleForm.controls.nameSuffix.setValue(cleaned, { emitEvent: false });
         }
+        const full = roleNameFromSuffix(cleaned);
+        this.roleForm.controls.name.setValue(full, { emitEvent: false });
+        this.roleForm.controls.normalized_name.setValue(full, { emitEvent: false });
       });
+  }
+
+  protected isEditingProtectedRole(): boolean {
+    const id = this.editingRoleId();
+    if (id == null) return false;
+    const role = this.rolesStore.roles().find((r) => r.id === id);
+    return role ? this.isProtectedRole(role) : false;
+  }
+
+  protected fullRoleNamePreview(): string {
+    return roleNameFromSuffix(this.roleForm.controls.nameSuffix.value);
+  }
+
+  protected roleSuffixError(): string | null {
+    const control = this.roleForm.controls.nameSuffix;
+    if (!control.touched && !control.dirty) {
+      return null;
+    }
+    if (control.hasError('required')) {
+      return 'Enter a suffix after ROLE_';
+    }
+    if (control.hasError('roleNameFormat')) {
+      return ROLE_NAME_FORMAT_HINT;
+    }
+    return null;
+  }
+
+  protected onSuffixBlur(): void {
+    const cleaned = normalizeRoleName(this.roleForm.controls.nameSuffix.value).replace(/^ROLE_/, '');
+    this.roleForm.controls.nameSuffix.setValue(cleaned, { emitEvent: true });
+    this.roleForm.controls.nameSuffix.markAsTouched();
   }
 
   ngOnInit() {
@@ -390,12 +505,36 @@ export class RolesComponent implements OnInit {
   }
 
   protected openCreateModal(role?: RolesTable): void {
+    if (role && this.isProtectedRole(role)) {
+      return;
+    }
     if (role) {
       this.editingRoleId.set(role.id);
-      this.roleForm.reset({ name: role.name, normalized_name: role.normalized_name });
+      if (this.isProtectedRole(role)) {
+        this.roleForm.reset({
+          name: role.name,
+          normalized_name: role.normalized_name,
+          nameSuffix: ''
+        });
+        this.roleForm.disable({ emitEvent: false });
+      } else {
+        const full = ensureRoleNamePrefix(role.normalized_name || role.name);
+        const suffix = roleNameSuffix(full);
+        this.roleForm.reset({
+          name: full,
+          normalized_name: full,
+          nameSuffix: suffix
+        });
+        this.roleForm.enable({ emitEvent: false });
+      }
     } else {
       this.editingRoleId.set(null);
-      this.roleForm.reset({ name: '', normalized_name: '' });
+      this.roleForm.reset({
+        name: ROLE_NAME_PREFIX,
+        normalized_name: ROLE_NAME_PREFIX,
+        nameSuffix: ''
+      });
+      this.roleForm.enable({ emitEvent: false });
     }
     this.isCreateOpen.set(true);
   }
@@ -405,28 +544,48 @@ export class RolesComponent implements OnInit {
   }
 
   protected onModalClose(): void {
-    this.roleForm.reset();
+    this.roleForm.reset({
+      name: ROLE_NAME_PREFIX,
+      normalized_name: ROLE_NAME_PREFIX,
+      nameSuffix: ''
+    });
+    this.roleForm.enable({ emitEvent: false });
+    this.editingRoleId.set(null);
     this.isCreateOpen.set(false);
   }
 
   protected onCreateSubmit(): void {
+    if (this.roleForm.disabled) {
+      this.closeCreateModal();
+      return;
+    }
+
+    const full = roleNameFromSuffix(this.roleForm.controls.nameSuffix.value);
+    this.roleForm.patchValue(
+      {
+        name: full,
+        normalized_name: full,
+        nameSuffix: roleNameSuffix(full)
+      },
+      { emitEvent: false }
+    );
+
     if (this.roleForm.invalid) {
       this.roleForm.markAllAsTouched();
       return;
     }
 
-    const formVal = this.roleForm.getRawValue();
     const editId = this.editingRoleId();
 
     if (editId) {
       this.rolesStore.editRole(editId, {
-        name: formVal.name,
-        normalized_name: formVal.normalized_name
+        name: full,
+        normalized_name: full
       });
     } else {
       this.rolesStore.addRole({
-        name: formVal.name,
-        normalized_name: formVal.normalized_name
+        name: full,
+        normalized_name: full
       });
     }
 

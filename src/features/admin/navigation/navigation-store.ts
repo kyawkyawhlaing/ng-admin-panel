@@ -5,6 +5,8 @@ import { lastValueFrom } from 'rxjs';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { createDebouncedTask, SEARCH_DEBOUNCE_MS } from '../../../shared/util/debounce';
 import { NavigationItemTable } from '../../../types/database';
+import { NavMenuService } from '../../../core/nav/nav-menu.service';
+import { isProtectedNavigation } from '../../../core/auth/system-defaults.util';
 
 export interface NavigationState {
   items: NavigationItemTable[];
@@ -30,7 +32,7 @@ const initialState: NavigationState = {
 
 export const NavigationStore = signalStore(
   withState(initialState),
-  withMethods((store, http = inject(HttpClient), toast = inject(ToastService)) => {
+  withMethods((store, http = inject(HttpClient), toast = inject(ToastService), navMenu = inject(NavMenuService)) => {
     const debouncedSearch = createDebouncedTask(SEARCH_DEBOUNCE_MS);
 
     const loadItems = async (background: boolean = false) => {
@@ -57,6 +59,10 @@ export const NavigationStore = signalStore(
       } catch (err: any) {
         patchState(store, { error: err.message, isLoading: false });
       }
+    };
+
+    const refreshSidebar = async () => {
+      await navMenu.loadNavigation();
     };
 
     return {
@@ -105,6 +111,7 @@ export const NavigationStore = signalStore(
           await lastValueFrom(http.post('/navigation', item));
           toast.success('Navigation item successfully created!');
           await loadItems(true);
+          await refreshSidebar();
         } catch (err: any) {
           toast.error(`Failed to create navigation item: ${err.message || 'Unknown error'}`);
           console.error('Error adding navigation item:', err);
@@ -116,9 +123,64 @@ export const NavigationStore = signalStore(
           await lastValueFrom(http.put(`/navigation/${id}`, item));
           toast.success('Navigation item successfully updated!');
           await loadItems(true);
+          await refreshSidebar();
         } catch (err: any) {
           toast.error(`Failed to update navigation item: ${err.message || 'Unknown error'}`);
           console.error('Error editing navigation item:', err);
+        }
+      },
+
+      async toggleActive(id: number): Promise<void> {
+        const item = store.items().find((i) => i.id === id);
+        if (!item || isProtectedNavigation(item.resource, item.route)) return;
+
+        try {
+          await lastValueFrom(
+            http.put(`/navigation/${id}`, {
+              title: item.title,
+              route: item.route,
+              resource: item.resource,
+              icon: item.icon,
+              description: item.description,
+              parent_id: item.parent_id,
+              sort_order: item.sort_order,
+              is_active: !item.is_active,
+              is_visible: item.is_visible
+            })
+          );
+          await loadItems(true);
+          await refreshSidebar();
+          toast.success(item.is_active ? 'Item deactivated' : 'Item activated');
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to update active status');
+          console.error('Error toggling active:', err);
+        }
+      },
+
+      async toggleVisible(id: number): Promise<void> {
+        const item = store.items().find((i) => i.id === id);
+        if (!item || isProtectedNavigation(item.resource, item.route)) return;
+
+        try {
+          await lastValueFrom(
+            http.put(`/navigation/${id}`, {
+              title: item.title,
+              route: item.route,
+              resource: item.resource,
+              icon: item.icon,
+              description: item.description,
+              parent_id: item.parent_id,
+              sort_order: item.sort_order,
+              is_active: item.is_active,
+              is_visible: !item.is_visible
+            })
+          );
+          await loadItems(true);
+          await refreshSidebar();
+          toast.success(item.is_visible ? 'Hidden from sidebar' : 'Visible in sidebar');
+        } catch (err: any) {
+          toast.error(err?.error?.detail || err?.message || 'Failed to update sidebar visibility');
+          console.error('Error toggling visibility:', err);
         }
       },
 
@@ -127,6 +189,7 @@ export const NavigationStore = signalStore(
           await lastValueFrom(http.delete(`/navigation/${id}`));
           toast.success('Navigation item deleted');
           await loadItems(true);
+          await refreshSidebar();
           return true;
         } catch (err: any) {
           toast.error(err?.error?.detail || err?.message || 'Failed to delete navigation item');

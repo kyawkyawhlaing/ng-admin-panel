@@ -2,6 +2,7 @@ export type ActionStatus = 'access' | 'create' | 'delete' | 'edit' | 'view';
 
 export interface ResourceTable {
   name: string;
+  system_default: boolean;
 }
 
 export interface NavigationItemTable {

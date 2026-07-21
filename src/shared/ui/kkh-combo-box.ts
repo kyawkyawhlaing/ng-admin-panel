@@ -81,6 +81,8 @@ export class KkhComboBoxComponent implements ControlValueAccessor {
   readonly extraOptions = input<SelectOption[]>([]);
   /** When set, loads options from POST endpoint using ListQuery.searchTerm */
   readonly endpoint = input<string | null>(null);
+  /** Merged into POST body when loading from endpoint (e.g. exclude_core_resources). */
+  readonly queryExtras = input<Record<string, unknown>>({});
   readonly mapItem = input<(item: any) => SelectOption>((item) => ({
     value: String(item.id ?? item.name ?? item.status ?? item.value),
     label: String(item.name ?? item.label ?? item.status ?? item.id),
@@ -219,7 +221,11 @@ export class KkhComboBoxComponent implements ControlValueAccessor {
     if (!url) return;
     this.loading.set(true);
     try {
-      const items = await this.listDs.searchOptions(url, term, (item) => this.mapItem()(item));
+      const extras = { ...this.queryExtras() };
+      if (url.includes('/assignable/')) {
+        extras['exclude_system_defaults'] = true;
+      }
+      const items = await this.listDs.searchOptions(url, term, (item) => this.mapItem()(item), 20, extras);
       this.remoteOptions.set(items);
     } catch {
       this.remoteOptions.set([]);

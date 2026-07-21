@@ -1,10 +1,12 @@
 /** Built-in IAM defaults that cannot be removed from the console. */
 
+export const SYSTEM_DEFAULT_LABEL = 'System default';
+
 export const SYSADMIN_ROLE_NAME = 'sysadmin';
 export const SYSADMIN_NORMALIZED_NAME = 'SYSADMIN';
 export const DEFAULT_ADMIN_EMAIL = 'systemadmin@default.com';
 
-export const CORE_RESOURCES = ['users', 'roles', 'permissions', 'navigation'] as const;
+export const CORE_RESOURCES = ['users', 'roles', 'permissions', 'navigation', 'resources'] as const;
 
 export function isSysAdminRole(nameOrNormalized?: string | null): boolean {
   if (!nameOrNormalized) return false;
@@ -17,22 +19,46 @@ export function isCoreResource(resource?: string | null): boolean {
   return (CORE_RESOURCES as readonly string[]).includes(resource.trim().toLowerCase());
 }
 
+/** True when a resource row is marked system_default in the database. */
+export function isSystemDefaultResource(
+  resource?: string | { name?: string; system_default?: boolean } | null
+): boolean {
+  if (!resource) return false;
+  if (typeof resource === 'object') {
+    if (resource.system_default === true) return true;
+    return isCoreResource(resource.name);
+  }
+  return isCoreResource(resource);
+}
+
+/** Resources that may be assigned to custom navigation items. */
+export function isAssignableNavigationResource(
+  resource?: string | { system_default?: boolean } | null
+): boolean {
+  if (!resource) return false;
+  if (typeof resource === 'object') {
+    return !!resource && resource.system_default !== true;
+  }
+  return !isCoreResource(resource);
+}
+
 export function isProtectedPermission(name?: string | null, resource?: string | null): boolean {
-  if (isCoreResource(resource)) return true;
+  if (isSystemDefaultResource(resource)) return true;
   if (!name) return false;
   const lower = name.trim().toLowerCase();
   return CORE_RESOURCES.some((core) => lower.startsWith(`${core}_`));
 }
 
 export function isProtectedNavigation(resource?: string | null, route?: string | null): boolean {
-  if (isCoreResource(resource)) return true;
+  if (isSystemDefaultResource(resource)) return true;
   if (!route) return false;
   const normalized = route.trim().toLowerCase().replace(/\/$/, '');
   return (
     normalized === '/admin/users' ||
     normalized === '/admin/roles' ||
     normalized === '/admin/permissions' ||
-    normalized === '/admin/navigation'
+    normalized === '/admin/navigation' ||
+    normalized === '/admin/resources'
   );
 }
 

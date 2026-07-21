@@ -57,7 +57,8 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.resources (
-    name text NOT NULL
+    name text NOT NULL,
+    system_default boolean DEFAULT false NOT NULL
 );
 
 
@@ -217,11 +218,12 @@ ALTER TABLE public.users_roles OWNER TO postgres;
 --
 -- TOC entry 5065 (class 0 OID 17039)
 -- Dependencies: 219
-COPY public.resources (name) FROM stdin;
-users
-roles
-permissions
-navigation
+COPY public.resources (name, system_default) FROM stdin;
+users	t
+roles	t
+permissions	t
+navigation	t
+resources	t
 \.
 
 

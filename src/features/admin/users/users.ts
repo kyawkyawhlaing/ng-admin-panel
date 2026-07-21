@@ -13,6 +13,7 @@ import {
   KkhTransferComponent,
   KkhDialogComponent,
   KkhColumnDef,
+  KkhSystemDefaultBadgeComponent,
   SelectOption
 } from '../../../shared/ui';
 import { UsersTable } from '../../../types/database';
@@ -50,6 +51,7 @@ const passwordComplexityValidators = [
     KkhCellDefDirective,
     KkhTransferComponent,
     KkhDialogComponent,
+    KkhSystemDefaultBadgeComponent,
     LucideAngularModule
   ],
   providers: [
@@ -128,16 +130,16 @@ const passwordComplexityValidators = [
             type="button"
             class="kkh-relation-summary"
             [class.kkh-relation-summary--empty]="count === 0"
-            [disabled]="!canEdit()"
-            (click)="canEdit() && openAssignDialog(row.id)"
-            [attr.aria-label]="count === 0 ? 'Assign roles' : 'Manage ' + count + ' roles'"
-            [title]="count === 0 ? 'Assign roles' : count + ' roles assigned — click to manage'"
+            [disabled]="!canEdit() || isProtectedUser(row)"
+            (click)="canEdit() && !isProtectedUser(row) && openAssignDialog(row.id)"
+            [attr.aria-label]="isProtectedUser(row) ? 'System administrator roles are locked' : (count === 0 ? 'Assign roles' : 'Manage ' + count + ' roles')"
+            [title]="isProtectedUser(row) ? 'System administrator cannot be edited' : (count === 0 ? 'Assign roles' : count + ' roles assigned — click to manage')"
           >
             <span class="kkh-relation-summary__count">
               <span class="kkh-relation-summary__label">
                 {{ count === 0 ? 'No roles' : count + (count === 1 ? ' role' : ' roles') }}
               </span>
-              @if (canEdit()) {
+              @if (canEdit() && !isProtectedUser(row)) {
                 <span class="kkh-relation-summary__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 20h9" />
@@ -163,7 +165,7 @@ const passwordComplexityValidators = [
               <span class="kkh-relation-summary__label">
                 {{ row.is_locked_out ? 'Locked Out' : 'Active' }}
               </span>
-              @if (canEdit()) {
+              @if (canEdit() && !isProtectedUser(row)) {
                 <span class="kkh-relation-summary__icon" aria-hidden="true">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 20h9" />
@@ -181,16 +183,16 @@ const passwordComplexityValidators = [
               type="button"
               class="kkh-relation-summary"
               [class.kkh-relation-summary--empty]="!row.two_factor_required"
-              [disabled]="!canEdit()"
-              (click)="canEdit() && usersStore.toggleMfaRequired(row.id)"
+              [disabled]="!canEdit() || isProtectedUser(row)"
+              (click)="canEdit() && !isProtectedUser(row) && usersStore.toggleMfaRequired(row.id)"
               [attr.aria-label]="row.two_factor_required ? 'Clear MFA requirement' : 'Require MFA'"
-              [title]="row.two_factor_required ? 'MFA required — click to clear policy' : 'Not required — click to require MFA'"
+              [title]="isProtectedUser(row) ? 'System administrator cannot be edited' : (row.two_factor_required ? 'MFA required — click to clear policy' : 'Not required — click to require MFA')"
             >
               <span class="kkh-relation-summary__count">
                 <span class="kkh-relation-summary__label">
                   {{ row.two_factor_required ? 'Required' : 'Optional' }}
                 </span>
-                @if (canEdit()) {
+                @if (canEdit() && !isProtectedUser(row)) {
                   <span class="kkh-relation-summary__icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M12 20h9" />
@@ -208,7 +210,7 @@ const passwordComplexityValidators = [
             >
               {{ row.two_factor_enabled ? 'Enrolled' : 'Not enrolled' }}
             </span>
-            @if (canEdit() && row.two_factor_enabled) {
+            @if (canEdit() && !isProtectedUser(row) && row.two_factor_enabled) {
               <button
                 type="button"
                 class="text-left text-[10px] font-mono uppercase tracking-wider text-[var(--kkh-danger)] hover:underline cursor-pointer"
@@ -227,7 +229,10 @@ const passwordComplexityValidators = [
 
         <ng-template kkhCell="actions" let-row>
           <div class="flex items-center justify-end gap-3">
-            @if (canEdit()) {
+            @if (isProtectedUser(row)) {
+              <kkh-system-default-badge />
+            }
+            @if (canEdit() && !isProtectedUser(row)) {
               <button
                 type="button"
                 (click)="openCreateModal(row)"
@@ -517,6 +522,9 @@ export class UsersComponent implements OnInit {
   }
 
   protected openCreateModal(user?: UsersTable): void {
+    if (user && this.isProtectedUser(user)) {
+      return;
+    }
     if (user) {
       this.editingUserId.set(user.id);
       this.userForm.reset({

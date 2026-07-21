@@ -522,6 +522,15 @@ kkh-button.kkh-host-full .kkh-btn {
   color: var(--kkh-muted);
 }
 
+.kkh-chip-system {
+  border-left-color: var(--kkh-warning, #d4a017);
+  color: var(--kkh-warning, #d4a017);
+  background: color-mix(in srgb, var(--kkh-warning, #d4a017) 10%, transparent);
+  font-size: 0.625rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .kkh-chip-warning {
   border-left-color: var(--kkh-warning);
   color: var(--kkh-warning);
@@ -810,13 +819,13 @@ kkh-button.kkh-host-full .kkh-btn {
 }
 
 .kkh-page-enter {
-  animation: kkh-fade-up 0.28s ease both;
+  animation: kkh-fade-up 0.36s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @keyframes kkh-fade-up {
   from {
     opacity: 0;
-    transform: translateY(4px);
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -831,8 +840,14 @@ kkh-button.kkh-host-full .kkh-btn {
 
   .kkh-alert--scan::after,
   .kkh-toast__ttl-fill,
-  .kkh-progress--indeterminate .kkh-progress__fill {
+  .kkh-progress--indeterminate .kkh-progress__fill,
+  .kkh-nav-progress__bar,
+  .kkh-nav-progress__glow {
     animation: none !important;
+  }
+
+  .kkh-nav-progress {
+    transition: none !important;
   }
 
   .kkh-toast__ttl-fill {
@@ -1283,6 +1298,96 @@ kkh-button.kkh-host-full .kkh-btn {
 .kkh-progress--info .kkh-progress__fill {
   background: linear-gradient(90deg, color-mix(in srgb, var(--kkh-info) 55%, transparent), var(--kkh-info));
   box-shadow: 0 0 10px color-mix(in srgb, var(--kkh-info) 35%, transparent);
+}
+
+/* ——— Route navigation progress (top edge) ——— */
+.kkh-nav-progress-host {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 10000;
+  pointer-events: none;
+  height: 0;
+}
+
+.kkh-nav-progress {
+  position: relative;
+  height: 2px;
+  width: 100%;
+  opacity: 0;
+  transform: translateY(-2px);
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.kkh-nav-progress--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.kkh-nav-progress__bar {
+  position: relative;
+  height: 100%;
+  width: 0;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--kkh-accent) 40%, transparent),
+    var(--kkh-accent)
+  );
+  box-shadow: 0 0 10px color-mix(in srgb, var(--kkh-accent) 55%, transparent);
+  transition: width 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.kkh-nav-progress--finishing .kkh-nav-progress__bar {
+  transition-duration: 0.16s;
+}
+
+.kkh-nav-progress__glow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72px;
+  height: 100%;
+  transform: translateX(30%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--kkh-accent) 80%, white)
+  );
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.kkh-nav-progress--visible .kkh-nav-progress__glow {
+  animation: kkh-nav-progress-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes kkh-nav-progress-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Soft document view-transition when supported */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.28s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+
+  .kkh-nav-progress--visible .kkh-nav-progress__glow {
+    animation: none !important;
+  }
 }
 
 .shadow-xs,

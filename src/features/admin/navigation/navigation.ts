@@ -12,6 +12,7 @@ import {
   KkhCellDefDirective,
   KkhDialogComponent,
   KkhColumnDef,
+  KkhSystemDefaultBadgeComponent,
   SelectOption
 } from '../../../shared/ui';
 import { NavigationItemTable } from '../../../types/database';
@@ -33,6 +34,7 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Tras
     KkhDataTableComponent,
     KkhCellDefDirective,
     KkhDialogComponent,
+    KkhSystemDefaultBadgeComponent,
     LucideAngularModule
   ],
   providers: [
@@ -145,23 +147,68 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Tras
         </ng-template>
 
         <ng-template kkhCell="status" let-row>
-          <div class="flex items-center gap-2">
-            @if (row.is_active) {
-              <span class="kkh-chip kkh-chip-ok">Active</span>
-            } @else {
-              <span class="kkh-chip kkh-chip-muted">Inactive</span>
-            }
-            @if (row.is_visible) {
-              <span class="kkh-chip kkh-chip-accent">Visible</span>
-            } @else {
-              <span class="kkh-chip kkh-chip-muted">Hidden</span>
-            }
-          </div>
+          @if (isProtectedNavItem(row) || !canEdit()) {
+            <div class="flex flex-col gap-1.5 min-w-[9rem]">
+              <span class="kkh-chip w-fit" [class.kkh-chip-ok]="row.is_active" [class.kkh-chip-muted]="!row.is_active">
+                {{ row.is_active ? 'Active' : 'Inactive' }}
+              </span>
+              <span class="kkh-chip w-fit" [class.kkh-chip-accent]="row.is_visible" [class.kkh-chip-muted]="!row.is_visible"
+                [title]="isProtectedNavItem(row) ? 'Built-in navigation cannot be changed' : null">
+                {{ row.is_visible ? 'Visible' : 'Hidden' }}
+              </span>
+            </div>
+          } @else {
+            <div class="flex flex-col gap-1.5 min-w-[9rem]">
+              <button
+                type="button"
+                class="kkh-relation-summary"
+                [class.kkh-relation-summary--empty]="!row.is_active"
+                (click)="navigationStore.toggleActive(row.id)"
+                [attr.aria-label]="row.is_active ? 'Deactivate item' : 'Activate item'"
+                [title]="row.is_active ? 'Active — click to deactivate' : 'Inactive — click to activate'"
+              >
+                <span class="kkh-relation-summary__count">
+                  <span class="kkh-relation-summary__label">
+                    {{ row.is_active ? 'Active' : 'Inactive' }}
+                  </span>
+                  <span class="kkh-relation-summary__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </span>
+                </span>
+              </button>
+              <button
+                type="button"
+                class="kkh-relation-summary"
+                [class.kkh-relation-summary--empty]="!row.is_visible"
+                (click)="navigationStore.toggleVisible(row.id)"
+                [attr.aria-label]="row.is_visible ? 'Hide from sidebar' : 'Show in sidebar'"
+                [title]="row.is_visible ? 'Visible in sidebar — click to hide' : 'Hidden from sidebar — click to show'"
+              >
+                <span class="kkh-relation-summary__count">
+                  <span class="kkh-relation-summary__label">
+                    {{ row.is_visible ? 'Visible' : 'Hidden' }}
+                  </span>
+                  <span class="kkh-relation-summary__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 20h9" />
+                      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                    </svg>
+                  </span>
+                </span>
+              </button>
+            </div>
+          }
         </ng-template>
 
         <ng-template kkhCell="actions" let-row>
           <div class="flex items-center justify-end gap-3">
-            @if (canEdit()) {
+            @if (isProtectedNavItem(row)) {
+              <kkh-system-default-badge />
+            }
+            @if (canEdit() && !isProtectedNavItem(row)) {
             <button
               type="button"
               (click)="openCreateModal(row)"
@@ -214,8 +261,8 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Tras
           <kkh-combo-box
             label="Access resource"
             formControlName="resource"
-            placeholder="Select a resource..."
-            endpoint="/navigation/resources/list"
+            placeholder="Select a custom resource..."
+            endpoint="/navigation/resources/assignable/list"
             [mapItem]="resourceMapItem"
             [error]="navForm.get('resource')?.hasError('required') && navForm.get('resource')?.touched ? 'Resource is required' : null"
           />
@@ -252,30 +299,6 @@ import { LucideAngularModule, LUCIDE_ICONS, LucideIconProvider, Menu, Edit, Tras
           placeholder="Brief description of this navigation item..."
           [error]="navForm.get('description')?.hasError('required') && navForm.get('description')?.touched ? 'Description is required' : null"
         />
-
-        <div class="kkh-dialog__section">
-          <span class="kkh-field-label">Visibility</span>
-
-          <div class="flex flex-col gap-3">
-            <label class="flex items-center cursor-pointer select-none">
-              <input
-                type="checkbox"
-                formControlName="is_active"
-                class="h-4 w-4 rounded-sm border-[var(--kkh-border)] bg-[var(--kkh-panel)] text-[var(--kkh-accent)] cursor-pointer"
-              />
-              <span class="ml-3 text-sm text-[var(--kkh-text)]">Active</span>
-            </label>
-
-            <label class="flex items-center cursor-pointer select-none">
-              <input
-                type="checkbox"
-                formControlName="is_visible"
-                class="h-4 w-4 rounded-sm border-[var(--kkh-border)] bg-[var(--kkh-panel)] text-[var(--kkh-accent)] cursor-pointer"
-              />
-              <span class="ml-3 text-sm text-[var(--kkh-text)]">Visible in sidebar</span>
-            </label>
-          </div>
-        </div>
       </form>
       <div footer class="contents">
         <kkh-button variant="ghost" type="button" (pressed)="closeCreateModal()">Cancel</kkh-button>
@@ -371,6 +394,9 @@ export class NavigationComponent implements OnInit {
   }
 
   protected openCreateModal(item?: NavigationItemTable): void {
+    if (item && this.isProtectedNavItem(item)) {
+      return;
+    }
     if (item) {
       this.editingItemId.set(item.id);
       this.navForm.reset({

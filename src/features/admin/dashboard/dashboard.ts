@@ -50,7 +50,7 @@ interface ListMeta {
         </div>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         @for (stat of stats(); track stat.name) {
           <a [routerLink]="stat.route" class="kkh-panel relative overflow-hidden px-5 pt-5 pb-6 block hover:border-[var(--kkh-accent)] transition-colors group">
             <div class="absolute left-0 top-0 h-full w-0.5 bg-[var(--kkh-accent)] opacity-60 group-hover:opacity-100 transition-opacity"></div>
@@ -80,25 +80,28 @@ export class DashboardComponent implements OnInit {
     { name: 'Users', value: '0', hint: 'Identity module', route: '/admin/users' },
     { name: 'Roles', value: '0', hint: 'RBAC roles', route: '/admin/roles' },
     { name: 'Permissions', value: '0', hint: 'Policy grants', route: '/admin/permissions' },
-    { name: 'Navigation', value: '0', hint: 'Nav resources', route: '/admin/navigation' }
+    { name: 'Navigation', value: '0', hint: 'Nav resources', route: '/admin/navigation' },
+    { name: 'Resources', value: '0', hint: 'IAM catalog', route: '/admin/resources' }
   ]);
 
   async ngOnInit(): Promise<void> {
     const emptyPayload = { pageNumber: 1, pageSize: 1 };
     const started = performance.now();
     try {
-      const [users, roles, permissions, navigation] = await Promise.all([
+      const [users, roles, permissions, navigation, resources] = await Promise.all([
         lastValueFrom(this.http.post<ListMeta>('/users/list', emptyPayload)),
         lastValueFrom(this.http.post<ListMeta>('/roles/list', emptyPayload)),
         lastValueFrom(this.http.post<ListMeta>('/permissions/list', emptyPayload)),
-        lastValueFrom(this.http.post<ListMeta>('/navigation/list', emptyPayload))
+        lastValueFrom(this.http.post<ListMeta>('/navigation/list', emptyPayload)),
+        lastValueFrom(this.http.post<ListMeta>('/navigation/resources/list', emptyPayload))
       ]);
 
       this.stats.set([
         { name: 'Users', value: String(users.metadata.totalCount), hint: 'Identity module', route: '/admin/users' },
         { name: 'Roles', value: String(roles.metadata.totalCount), hint: 'RBAC roles', route: '/admin/roles' },
         { name: 'Permissions', value: String(permissions.metadata.totalCount), hint: 'Policy grants', route: '/admin/permissions' },
-        { name: 'Navigation', value: String(navigation.metadata.totalCount), hint: 'Nav resources', route: '/admin/navigation' }
+        { name: 'Navigation', value: String(navigation.metadata.totalCount), hint: 'Nav resources', route: '/admin/navigation' },
+        { name: 'Resources', value: String(resources.metadata.totalCount), hint: 'IAM catalog', route: '/admin/resources' }
       ]);
       this.linkStatus.set('online');
       this.latencyMs.set(Math.round(performance.now() - started));
