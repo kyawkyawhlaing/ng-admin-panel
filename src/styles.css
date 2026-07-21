@@ -584,11 +584,13 @@ kkh-button.kkh-host-full .kkh-btn {
 
 .kkh-relation-summary__icon {
   display: inline-flex;
-  width: 0;
-  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  width: 0.875rem;
+  flex-shrink: 0;
   opacity: 0;
   color: var(--kkh-accent);
-  transition: width 0.15s ease, opacity 0.15s ease, margin 0.15s ease;
+  transition: opacity 0.15s ease;
 }
 
 .kkh-relation-summary__icon svg {
@@ -606,7 +608,6 @@ kkh-button.kkh-host-full .kkh-btn {
 
 .kkh-relation-summary:not(:disabled):hover .kkh-relation-summary__icon,
 .kkh-relation-summary:not(:disabled):focus-visible .kkh-relation-summary__icon {
-  width: 0.875rem;
   opacity: 1;
 }
 
