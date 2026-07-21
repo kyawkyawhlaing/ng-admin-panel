@@ -6,7 +6,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "ng-admin-panel": {
+    "kyawhlaing-admin": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -65,10 +65,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "ng-admin-panel:build:production"
+              "buildTarget": "kyawhlaing-admin:build:production"
             },
             "development": {
-              "buildTarget": "ng-admin-panel:build:development"
+              "buildTarget": "kyawhlaing-admin:build:development"
             }
           },
           "defaultConfiguration": "development"

@@ -1,8 +1,10 @@
 # Backend API Integration Guide
 
-This guide explains how to replace the current Express mock API (`src/server/`) with a real backend service such as **ASP.NET Core**, **Java (Spring Boot)**, **Rust**, or **Python (FastAPI/Django)**.
+This guide explains how the Angular app talks to the **KyawHlaing** ASP.NET Core API (CORS, JWT, HTTP paths).
 
-Since the application uses an NgRx SignalStore and Angular's `HttpClient` for data fetching, migrating to a real backend is a straightforward process of redirecting API calls and enforcing security policies.
+> **Adding a new admin module?** See **[AddingAdminModule.md](./AddingAdminModule.md)** for how resource names, permissions, routes, and stores align between FE and BE.
+
+This document also covers replacing the legacy Express mock API (`src/server/`) if you are not using the live backend.
 
 ## Step 1: Configure CORS on the Backend
 

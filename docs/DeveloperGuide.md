@@ -1,12 +1,14 @@
 # Developer Guide
 
-Welcome to the ng-admin-panel Developer Guide. This document provides a concise, step-by-step process for implementing new features consistently according to our architectural standards.
+Welcome to the kyawhlaing-admin Developer Guide. This document provides a concise, step-by-step process for implementing new features consistently according to our architectural standards.
 
 ## Architecture Overview
 - **Framework:** Angular v22+ (Standalone-by-default, Zoneless Change Detection)
 - **State Management:** NgRx SignalStore & local Signals
 - **Styling:** Tailwind CSS v4
-- **Mock Backend:** Express Server (`src/server/`)
+- **API:** KyawHlaing ASP.NET Core backend (`https://localhost:5001` in development)
+
+> **Admin modules (IAM screens):** For a new console page wired to KyawHlaing permissions and navigation, follow **[AddingAdminModule.md](./AddingAdminModule.md)** instead of the generic mock steps below.
 
 ---
 
@@ -155,7 +157,7 @@ Because the application uses Angular Server-Side Rendering (SSR), the request hi
 - **Path Rewrite:** It strips the `/api` prefix, changing the path from `/api/users/register` to `/users/register`.
 - It securely forwards the POST request over the network to the `.NET` backend.
 
-### 4. The ASP.NET Core Backend (\`Dotnet-NTier\`)
+### 4. The ASP.NET Core Backend (`KyawHlaing`)
 The backend is responsible for the actual business logic and database persistence:
 - The C# server receives the authorized `POST /users/register` request.
 - It validates the payload against the `RegisterUserCommandValidator`.
@@ -186,7 +188,7 @@ To build the application for production, run:
 npm run build
 ```
 
-This compiles both the Angular browser bundle and the Node.js server bundle. The output will be located in the `dist/ng-admin-panel/` directory.
+This compiles both the Angular browser bundle and the Node.js server bundle. The output will be located in the `dist/kyawhlaing-admin/` directory.
 
 ### 2. Deploying to a Linux VPS
 
@@ -198,11 +200,11 @@ The recommended way to run the Node.js application in production on Linux is usi
 - Nginx installed (`sudo apt install nginx`)
 
 **Deployment Steps:**
-1. **Transfer Files:** Copy the compiled `dist/ng-admin-panel/` directory to your Linux server (e.g., `/var/www/ng-admin-panel`).
+1. **Transfer Files:** Copy the compiled `dist/kyawhlaing-admin/` directory to your Linux server (e.g., `/var/www/kyawhlaing-admin`).
 2. **Start the Server:** Navigate to your project directory and start the Express server using PM2.
    ```bash
-   cd /var/www/ng-admin-panel
-   pm2 start server/server.mjs --name "ng-admin-panel"
+   cd /var/www/kyawhlaing-admin
+   pm2 start server/server.mjs --name "kyawhlaing-admin"
    ```
 3. **Persist PM2:** Ensure PM2 restarts automatically on server reboots.
    ```bash
@@ -227,7 +229,7 @@ The recommended way to run the Node.js application in production on Linux is usi
    ```
 5. **Enable and Restart Nginx:**
    ```bash
-   sudo ln -s /etc/nginx/sites-available/ng-admin-panel /etc/nginx/sites-enabled/
+   sudo ln -s /etc/nginx/sites-available/kyawhlaing-admin /etc/nginx/sites-enabled/
    sudo systemctl restart nginx
    ```
 
@@ -243,12 +245,12 @@ On a Windows Server, you have two common approaches: Using PM2 for Windows, or u
 - `pm2-windows-service` installed to run PM2 as a Windows service (`npm install -g pm2-windows-service`).
 
 **Deployment Steps:**
-1. **Transfer Files:** Copy the compiled `dist/ng-admin-panel/` directory to your Windows server (e.g., `C:\inetpub\ng-admin-panel`).
+1. **Transfer Files:** Copy the compiled `dist/kyawhlaing-admin/` directory to your Windows server (e.g., `C:\inetpub\kyawhlaing-admin`).
 2. **Start the Application:**
    Open an Administrator Command Prompt/PowerShell.
    ```powershell
-   cd C:\inetpub\ng-admin-panel
-   pm2 start server/server.mjs --name "ng-admin-panel"
+   cd C:\inetpub\kyawhlaing-admin
+   pm2 start server/server.mjs --name "kyawhlaing-admin"
    ```
 3. **Install Windows Service:** Install PM2 as a Windows service so it runs on startup.
    ```powershell
@@ -261,7 +263,7 @@ On a Windows Server, you have two common approaches: Using PM2 for Windows, or u
 
 If you heavily rely on IIS, you can host the SSR server using `iisnode`.
 1. Install **IIS**, the **URL Rewrite** module, and **iisnode**.
-2. Transfer the `dist/ng-admin-panel/` output to your IIS site folder.
+2. Transfer the `dist/kyawhlaing-admin/` output to your IIS site folder.
 3. Create a `web.config` file in the root of your application folder to intercept traffic and route it through `iisnode` to `server/server.mjs`.
 
 *Note: Since the output is compiled to an `.mjs` ES module, ensure you are running a Node.js version natively supported by your iisnode configuration that supports ES modules.*

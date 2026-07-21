@@ -3,6 +3,7 @@ import { inject } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { ToastService } from '../../shared/ui/toast.service';
+import { resolveForbiddenMessage } from '../auth/permission-denied.util';
 
 export const apiInterceptor: HttpInterceptorFn = (req, next) => {
   const toast = inject(ToastService);
@@ -24,7 +25,7 @@ export const apiInterceptor: HttpInterceptorFn = (req, next) => {
         // Auth/session failures are handled by AuthStore / calling screens.
         errorMsg = '';
       } else if (error.status === 403) {
-        errorMsg = 'You do not have permission to perform this action.';
+        errorMsg = resolveForbiddenMessage(req.method, req.url, error.error);
       } else if (
         req.url.includes('/users/login') ||
         req.url.includes('/users/logout') ||

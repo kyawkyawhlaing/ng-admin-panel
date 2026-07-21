@@ -94,4 +94,7 @@ The application follows a strictly typed, feature-driven architecture. Place all
 - Use **Tailwind CSS v4** utility classes exclusively. 
 - Avoid writing custom CSS in component style files unless utilizing complex pseudo-selectors or keyframe animations that Tailwind cannot handle cleanly.
 
+### 8. Admin modules (KyawHlaing IAM)
+When adding a new **admin console page** that maps to a backend resource and permissions, read **`docs/AddingAdminModule.md`** (and `KyawHlaing/docs/AddingAdminModule.md`). That covers route guards (`{resource}_access`), store API paths, sidebar via `/navigation/sidebar`, and permission-gated UI (`{resource}_view|create|edit|delete`).
+
 When asked to create a new feature, component, or store, analyze the directory structure above and place files in their exact designated locations while strictly adhering to these rules.

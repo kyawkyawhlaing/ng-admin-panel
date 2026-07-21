@@ -1,6 +1,6 @@
-# NgAdminPanel (Role-Based Access Control)
+# KyawHlaing Admin (Role-Based Access Control)
 
-NgAdminPanel is a modern, enterprise-grade admin dashboard built with Angular v22+. It implements a comprehensive Role-Based Access Control (RBAC) system natively designed for Server-Side Rendering (SSR).
+KyawHlaing Admin is a modern, enterprise-grade admin dashboard built with Angular v22+. It implements a comprehensive Role-Based Access Control (RBAC) system natively designed for Server-Side Rendering (SSR).
 
 ## Project Overview
 
@@ -20,7 +20,7 @@ The codebase is organized into a strictly typed, feature-driven architecture:
 - `src/shared/`: Reusable, stateless UI components that rely entirely on Signal inputs and outputs.
 - `src/types/`: Strict TypeScript models and database schemas used across the app.
 - `src/server/`: The Express backend implementation (BFF) providing mock data and SSR logic.
-- `docs/`: Developer guides and deployment instructions (e.g., `DeveloperGuide.md`, `BackendAPIIntegration.md`).
+- `docs/`: Developer guides and deployment instructions (e.g. `DeveloperGuide.md`, `AddingAdminModule.md`, `BackendAPIIntegration.md`).
 
 ## How to Run
 
@@ -31,7 +31,7 @@ The codebase is organized into a strictly typed, feature-driven architecture:
 ### Installation
 1. Clone the repository and navigate to the project directory:
    ```bash
-   cd ng-admin-panel
+   cd kyawhlaing-admin
    ```
 2. Install dependencies:
    ```bash
@@ -50,13 +50,15 @@ To build the application for production with SSR:
 ```bash
 pnpm run build
 ```
-The output will be placed in the `dist/ng-admin-panel/` directory.
+The output will be placed in the `dist/kyawhlaing-admin/` directory.
 
 ### Serving Production Build
 After building, you can serve the production Express server:
 ```bash
-pnpm run serve:ssr:ng-admin-panel
+pnpm run serve:ssr:kyawhlaing-admin
 ```
 
 ---
 For additional details on feature implementation, adding real APIs, or deploying to a VPS, please refer to the documents in the `docs/` folder.
+
+**Adding a new admin module (FE + BE):** see [`docs/AddingAdminModule.md`](docs/AddingAdminModule.md) and the backend companion [`../KyawHlaing/docs/AddingAdminModule.md`](../KyawHlaing/docs/AddingAdminModule.md).

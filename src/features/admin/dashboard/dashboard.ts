@@ -18,7 +18,7 @@ interface ListMeta {
       <kkh-page-header
         eyebrow="Overview"
         title="Dashboard"
-        description="Live IAM console metrics from KKH modules."
+        description="Live IAM console metrics from KyawHlaing modules."
       />
 
       <div class="kkh-raised px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-2">

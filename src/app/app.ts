@@ -11,7 +11,7 @@ import { KkhNavProgressComponent } from '../shared/ui/kkh-nav-progress';
   styleUrl: './app.css'
 })
 export class App {
-  protected readonly title = signal('ng-admin-panel');
+  protected readonly title = signal('kyawhlaing-admin');
   /** Eager init so html.dark syncs before feature routes load. */
   private readonly themeStore = inject(ThemeStore);
 }

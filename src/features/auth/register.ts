@@ -41,7 +41,7 @@ export const passwordMatchValidator: ValidatorFn = (control: AbstractControl): V
         <div class="w-full max-w-[420px]">
           <div class="text-center mb-8">
             <p class="kkh-label text-[var(--kkh-accent)]">Identity Console</p>
-            <h1 class="kkh-title mt-3 text-4xl sm:text-5xl text-[var(--kkh-text)] tracking-[0.18em]">KKH</h1>
+            <h1 class="kkh-title mt-3 text-4xl sm:text-5xl text-[var(--kkh-text)] tracking-[0.12em]">KyawHlaing</h1>
             <p class="mt-3 text-sm text-[var(--kkh-muted)]">Create an operator account</p>
           </div>
 

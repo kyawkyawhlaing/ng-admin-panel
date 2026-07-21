@@ -57,7 +57,8 @@ export const RolesStore = signalStore(
           isLoading: false 
         });
       } catch (err: any) {
-        patchState(store, { error: err.message, isLoading: false });
+        const message = err?.error?.detail || err?.message || 'Failed to load roles';
+        patchState(store, { error: message, isLoading: false });
       }
     };
 

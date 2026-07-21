@@ -3,6 +3,7 @@ import { computed, Signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { lastValueFrom } from 'rxjs';
 import { withCallState, setLoading, setLoaded, setError, CallState } from '../../core/stores/features/with-call-state';
+import { AuthStore, AuthStoreType } from '../../core/stores/auth-store';
 import { User, Role, Permission, Menu, UserRoleMapping, RolePermissionMapping } from '../../types/rbac';
 
 export interface AdminState {
@@ -59,7 +60,7 @@ export const AdminStore = signalStore(
   { providedIn: 'root' },
   withState(initialAdminState),
   withCallState(),
-  withMethods((store, http = inject(HttpClient)) => {
+  withMethods((store, http = inject(HttpClient), authStore = inject(AuthStore) as unknown as AuthStoreType) => {
     const fetchAllPages = async (endpoint: string): Promise<any[]> => {
       const pageSize = 50;
       let pageNumber = 1;
@@ -87,14 +88,25 @@ export const AdminStore = signalStore(
       // Backend Synced Loaders
       async loadRealData(): Promise<void> {
         try {
-          const roles = await fetchAllPages('/roles/list');
+          const canViewRoles = authStore.hasPermission('roles_view');
+          const canViewPermissions = authStore.hasPermission('permissions_view');
+          const canViewUsers = authStore.hasPermission('users_view');
+
+          const roles = canViewRoles ? await fetchAllPages('/roles/list') : [];
+          const permissions = canViewPermissions ? await fetchAllPages('/permissions/list') : [];
+          const mappings = canViewUsers
+            ? await lastValueFrom(http.get<{ userId: string; roleId: number }[]>('/users/roles-mapping'))
+            : [];
+          const rolePermMappings = canViewRoles
+            ? await lastValueFrom(http.get<{ roleId: number; permissionId: number }[]>('/roles/permissions-mapping'))
+            : [];
+
           const backendRoles = roles.map(r => ({
             id: r.id.toString(),
             name: r.name,
             description: `Normalized: ${r.normalized_name}`
           }));
 
-          const permissions = await fetchAllPages('/permissions/list');
           const backendPermissions = permissions.map(p => ({
             id: p.id.toString(),
             name: p.name,
@@ -104,11 +116,11 @@ export const AdminStore = signalStore(
             action: p.action as string
           }));
 
-          const mappings = await lastValueFrom(http.get<{userId: string, roleId: number}[]>('/users/roles-mapping'));
           const formatted = mappings.map(m => ({ userId: m.userId, roleId: m.roleId.toString() }));
-
-          const rolePermMappings = await lastValueFrom(http.get<{roleId: number, permissionId: number}[]>('/roles/permissions-mapping'));
-          const formattedRolePerms = rolePermMappings.map(m => ({ roleId: m.roleId.toString(), permissionId: m.permissionId.toString() }));
+          const formattedRolePerms = rolePermMappings.map(m => ({
+            roleId: m.roleId.toString(),
+            permissionId: m.permissionId.toString()
+          }));
 
           patchState(store, {
             roles: backendRoles,
@@ -117,7 +129,7 @@ export const AdminStore = signalStore(
             rolePermissions: formattedRolePerms
           });
         } catch (err) {
-          console.error("Error loading real data for admin store", err);
+          console.error('Error loading real data for admin store', err);
         }
       },
 

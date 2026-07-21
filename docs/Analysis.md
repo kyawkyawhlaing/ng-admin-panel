@@ -1,10 +1,10 @@
 # ASP.NET Core API Analysis
 
-This document provides an analysis of the `Dotnet-NTier` ASP.NET Core backend project and the steps required to integrate it with the `NgAdminPanel` Angular application.
+This document provides an analysis of the **KyawHlaing** ASP.NET Core backend (`KyawHlaing/`) and the steps required to integrate it with the `kyawhlaing-admin` Angular application.
 
 ## 1. Architectural Overview
 
-The backend uses a Clean N-Tier Architecture with **Minimal APIs** and **CQRS (MediatR)**. The endpoints are structurally grouped into domains, which perfectly mirrors the Angular feature domains.
+The backend is a feature-first **modulith** with **Minimal APIs** and **CQRS** (Scrutor + `ICommand`/`IQuery` — not MediatR). Endpoints are grouped by module, which mirrors the Angular feature domains.
 
 **Available API Categories:**
 - **Users**: Handled via endpoints like `POST /users/login`, `POST /users/register`.
